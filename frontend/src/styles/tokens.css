@@ -1,0 +1,114 @@
+/* Design tokens — UI_UX_SPEC.md §3.1 and §3.1a.
+ * Values not given by the spec are marked "assumption"; banner and chat colours come from
+ * docs/design/app_design.html. */
+:root {
+  color-scheme: light;
+
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-2: #eef2f8; /* app_design.html: table headers, chips */
+  --text: #14171f;
+  --text-muted: #5b6475;
+  --border: #e2e5ec;
+  --primary: #1f5fbf;
+  --primary-contrast: #ffffff;
+  --ai: #7a4fd6;
+  --ai-soft: #f5f0ff; /* app_design.html: active AI field */
+  --verified: #1e8e5a;
+  --pending: #b7791f;
+  /* Text shades of the two status colours that fall below 4.5:1 as small text on white
+   * (#b7791f 3.6:1, #1e8e5a 4.1:1). Same hues, darker: >= 4.9:1 on --surface, --bg and
+   * --surface-2. The base colours stay for borders and icons (3:1 is enough there). */
+  --pending-ink: #8f5d14;
+  --verified-ink: #18774b;
+  --on-verified-ink: #ffffff;
+  --flagged: #c2410c;
+  --rejected: #b42318;
+  --merged: #64748b;
+  --historical: #8a94a6;
+  --highlight: #ffe58f;
+  --highlight-text: #14171f;
+
+  /* Priority levels (filled pills, white text). */
+  --p-critical: #9f1239;
+  --p-high: #c2410c;
+  --p-medium: #a16207;
+  --p-low: #475569;
+
+  /* Need categories — assumption: §3.2 asks for a chip colour per need but gives none.
+   * One categorical mapping, reused by chips, legends, bars and map pins. Hues are a validated
+   * colourblind-safe sequence, in display order (lib/meta.ts NEED_ORDER). Always shown with an
+   * icon and a word, so a colour is never the only cue. */
+  --need-clean_water: #2a78d6;
+  --need-evacuation: #eb6834;
+  --need-shelter: #1baf7a;
+  --need-food: #eda100;
+  --need-medicine: #e87ba4;
+  --need-other: #008300;
+
+  /* Demo banner — app_design.html. */
+  --banner-bg: #fff7e0;
+  --banner-text: #7a5300;
+  --banner-border: #f1e2b0;
+
+  /* Simulator chat — app_design.html (generic styling, no WhatsApp branding). */
+  --chat-wa-bg: #eaf4ec;
+  --chat-wa-me: #d7f1dc;
+  --chat-sms-bg: #f1f3f6;
+  --chat-sms-me: #dfe3ea;
+  --chat-them: #ffffff;
+
+  --shadow-sm: 0 1px 2px rgb(20 23 31 / 0.06);
+  --shadow-md: 0 4px 16px rgb(20 23 31 / 0.08);
+}
+
+/* Dark theme — assumption: §3.1 requires one but lists only light values.
+ * Same roles and hierarchy; text pairs chosen for WCAG AA on --surface. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --bg: #0e1117;
+    --surface: #161a22;
+    --surface-2: #1f2430;
+    --text: #e7eaf0;
+    --text-muted: #a0a9ba;
+    --border: #2b3240;
+    --primary: #6fa2f2;
+    --primary-contrast: #0e1117;
+    --ai: #b49af5;
+    --ai-soft: #262040;
+    --verified: #4cc38a;
+    --pending: #e3ad55;
+    /* Dark shades already pass as text (>= 7.8:1 on --surface). */
+    --pending-ink: #e3ad55;
+    --verified-ink: #4cc38a;
+    --on-verified-ink: #0e1117;
+    --flagged: #f28a52;
+    --rejected: #f4766c;
+    --merged: #9aa8bc;
+    --historical: #8a94a6;
+    --highlight: #ffe58f;
+    --highlight-text: #14171f;
+
+    --need-clean_water: #3987e5;
+    --need-evacuation: #d95926;
+    --need-shelter: #199e70;
+    --need-food: #c98500;
+    --need-medicine: #d55181;
+    --need-other: #008300;
+
+    --banner-bg: #2e2510;
+    --banner-text: #f3d48b;
+    --banner-border: #4a3c17;
+
+    --chat-wa-bg: #13241a;
+    --chat-wa-me: #1d3b27;
+    --chat-sms-bg: #1a1e26;
+    --chat-sms-me: #2a3140;
+    --chat-them: #222834;
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 4px 16px rgb(0 0 0 / 0.45);
+  }
+}

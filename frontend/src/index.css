@@ -1,0 +1,242 @@
+@import 'tailwindcss';
+@import './styles/tokens.css';
+@import 'maplibre-gl/dist/maplibre-gl.css';
+
+/* Expose the tokens as Tailwind utilities, e.g. bg-surface, text-muted, border-border. */
+@theme inline {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-urdu: 'Noto Nastaliq Urdu', serif;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--primary-contrast);
+  --color-ai: var(--ai);
+  --color-ai-soft: var(--ai-soft);
+  --color-verified: var(--verified);
+  --color-pending: var(--pending);
+  --color-verified-ink: var(--verified-ink);
+  --color-pending-ink: var(--pending-ink);
+  --color-on-verified-ink: var(--on-verified-ink);
+  --color-flagged: var(--flagged);
+  --color-rejected: var(--rejected);
+  --color-merged: var(--merged);
+  --color-historical: var(--historical);
+  --color-highlight: var(--highlight);
+  --color-p-critical: var(--p-critical);
+  --color-p-high: var(--p-high);
+  --color-p-medium: var(--p-medium);
+  --color-p-low: var(--p-low);
+  --color-banner: var(--banner-bg);
+  --color-banner-text: var(--banner-text);
+  --color-banner-border: var(--banner-border);
+
+  --shadow-card: var(--shadow-sm);
+  --shadow-pop: var(--shadow-md);
+
+  /* §3.4: 14 / 16 / 20 / 24 / 30 px, line height 1.5. */
+  --text-sm--line-height: 1.5;
+  --text-base--line-height: 1.5;
+  --text-xl--line-height: 1.5;
+  --text-2xl--line-height: 1.5;
+  --text-3xl--line-height: 1.5;
+}
+
+@layer base {
+  html {
+    background-color: var(--bg);
+    color: var(--text);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+
+  mark {
+    background-color: var(--highlight);
+    color: var(--highlight-text);
+    border-radius: 2px;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* §3.4: Urdu script in Nastaliq at 1.15× size with line height 2.0. */
+@utility urdu {
+  font-family: var(--font-urdu);
+  font-size: 1.15em;
+  line-height: 2;
+}
+
+/* Shared component classes — one look for buttons, inputs and cards across all screens. */
+@layer components {
+  .card {
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .btn {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background-color: var(--surface);
+    padding: 0 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .btn:hover:not(:disabled) {
+    background-color: var(--surface-2);
+  }
+  .btn:disabled {
+    opacity: 0.5;
+  }
+  .btn-primary {
+    background-color: var(--primary);
+    border-color: var(--primary);
+    color: var(--primary-contrast);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background-color: var(--primary);
+    filter: brightness(1.08);
+  }
+  .btn-danger {
+    color: var(--rejected);
+    border-color: var(--rejected);
+  }
+  .btn-ghost {
+    border-color: transparent;
+    background-color: transparent;
+  }
+  /* Compact padding and type, but still the 44 px minimum touch target (§3.4). */
+  .btn-sm {
+    min-height: 44px;
+    padding: 0 0.75rem;
+  }
+
+  .input {
+    width: 100%;
+    min-height: 44px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background-color: var(--surface);
+    padding: 0.5rem 0.75rem;
+    color: var(--text);
+  }
+  .input::placeholder {
+    color: var(--text-muted);
+  }
+  .input[aria-invalid='true'] {
+    border-color: var(--rejected);
+  }
+
+  .label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+
+  .eyebrow {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .link {
+    color: var(--primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}
+
+/* §5.4: a row that moved up briefly highlights (disabled by prefers-reduced-motion above). */
+@keyframes row-moved {
+  from {
+    background-color: color-mix(in srgb, var(--highlight) 55%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+.row-moved {
+  animation: row-moved 1.6s ease-out;
+}
+
+kbd {
+  display: inline-block;
+  min-width: 1.4em;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--surface);
+  padding: 0 0.3em;
+  font-family: ui-monospace, monospace;
+  font-size: 0.8em;
+  text-align: center;
+}
+
+/* MapLibre controls follow the theme. */
+/* The zoom control keeps MapLibre's light background: its icons are dark images. */
+.maplibregl-ctrl-attrib {
+  background-color: var(--surface) !important;
+  color: var(--text);
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--text) !important;
+}
+.maplibregl-popup-content {
+  background-color: var(--surface);
+  color: var(--text);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md);
+  padding: 12px 14px;
+}
+.maplibregl-popup-tip {
+  border-top-color: var(--surface) !important;
+  border-bottom-color: var(--surface) !important;
+}
+.maplibregl-popup-close-button {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 20px;
+  color: var(--text);
+}
+
+/* MapLibre's zoom buttons default to 29 px; icons are centred backgrounds, so they scale safely. */
+.maplibregl-ctrl-group button {
+  width: 44px !important;
+  height: 44px !important;
+}
