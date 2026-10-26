@@ -9,7 +9,7 @@ Team **The Baghools** · License: [MIT](LICENSE)
 ---
 
 ## Contents
-[Problem](#problem-statement) · [Solution](#solution) · [Architecture](#architecture) · [Technology](#technology-stack) · [Setup](#setup-instructions) · [Demo](#demo) · [Evaluation](#evaluation) · [Privacy & safety](#privacy-safety-and-responsible-ai) · [Team](#team-contributions) · [AI tools & Kiro](#ai-tools-and-kiro) · [Limitations](#limitations-and-roadmap) · [License](#license) · [Acknowledgements](#acknowledgements)
+[Problem](#problem-statement) · [Why ReliefLens](#why-relieflens) · [Solution](#solution) · [Architecture](#architecture) · [Technology](#technology-stack) · [Setup](#setup-instructions) · [Demo](#demo) · [Evaluation](#evaluation) · [Privacy & safety](#privacy-safety-and-responsible-ai) · [Team](#team-contributions) · [AI tools & Kiro](#ai-tools-and-kiro) · [Limitations](#limitations-and-roadmap) · [License](#license) · [Acknowledgements](#acknowledgements)
 
 ---
 
@@ -24,6 +24,24 @@ Relief volunteers then face hundreds of messages that are:
 - **hard to locate** — "Lalkurti, Cantt, Rawalpindi" is not a pin on a map;
 
 Fully automatic AI triage is risky here: a confident but wrong summary can send help to the wrong place. **Intended users:** helpline volunteers and relief coordinators (reviewers), NGOs that need a clean list of verified needs, and the public who want to see where help is needed.
+
+## Why ReliefLens
+
+**Why our solution**
+- **Built for how Pakistan writes.** Roman Urdu first, plus Urdu script, English and mixed text. Most tools only understand English.
+- **Reaches people without smartphones or internet.** A plain SMS to the helpline number is enough; no app or data connection needed.
+- **AI that shows its work.** Gemma 4 quotes the exact words behind every need, quantity and place, so a reviewer can check it in seconds instead of trusting a summary.
+- **People stay in charge.** Nothing is published until a reviewer approves it, and the AI never ranks emergencies.
+- **Private and low-cost.** Gemma 4 runs on the organization's own machine through Ollama, so report text is not sent to a cloud AI service. The whole stack is open source.
+
+**What it provides to NGOs and social workers**
+- **One verified list instead of hundreds of messages** — needs, quantities and place for every report, already structured.
+- **Time saved** — reviewers confirm suggestions instead of reading and retyping each message.
+- **Fewer wasted trips and less fuel** — duplicates are merged and every approved need has a confirmed location, so vehicles go only to real, unserved needs.
+- **Better route and stock planning** — all needs on one map, grouped by area with quantities, and downloadable as CSV or GeoJSON for planning routes and loading the right supplies.
+- **Their own categories** — add what this disaster needs (e.g. *Blankets / کمبل*) and the AI starts using it immediately.
+- **Accountability** — every review action is recorded in the report's history.
+- **Safety for the people who ask for help** — phone numbers are masked, and the public map shows no text, numbers or exact locations.
 
 ## Solution
 
