@@ -17,7 +17,8 @@ router = APIRouter(prefix="/api/public", tags=["public"])
 def _public_reports(request: Request) -> list[dict]:
     settings = request.app.state.settings
     with request.app.state.engine.connect() as conn:
-        out = [repo.build_public(conn, b, settings) for b in repo.load_all(conn)]
+        approved = repo.approved_times(conn)
+        out = [repo.build_public(conn, b, settings, approved) for b in repo.load_all(conn, status="approved")]
     return [p for p in out if p is not None]
 
 

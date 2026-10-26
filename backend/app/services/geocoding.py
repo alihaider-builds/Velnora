@@ -16,10 +16,10 @@ import re
 import time
 
 import httpx
-from sqlalchemy import Engine, insert, select
+from sqlalchemy import Engine, select
 
 from app.config import Settings
-from app.db import geocode_cache
+from app.db import geocode_cache, upsert
 from app.services.normalize import normalize
 from app.timeutil import now_iso
 
@@ -83,10 +83,7 @@ class Geocoder:
             return []
         items = await (self._google_suggest(query) if self.provider == "google" else self._photon(query, limit))
         with self.engine.begin() as conn:
-            conn.execute(
-                insert(geocode_cache).prefix_with("OR REPLACE"),
-                {"query_norm": key, "results": items, "fetched_at": now_iso()},
-            )
+            upsert(conn, geocode_cache, {"query_norm": key, "results": items, "fetched_at": now_iso()}, "query_norm")
         return items[:limit]
 
     async def _photon(self, query: str, limit: int) -> list[dict]:
@@ -153,10 +150,8 @@ class Geocoder:
             return []
         candidates = await (self._google(query) if self.provider == "google" else self._nominatim(query, limit))
         with self.engine.begin() as conn:
-            conn.execute(
-                insert(geocode_cache).prefix_with("OR REPLACE"),
-                {"query_norm": key, "results": candidates, "fetched_at": now_iso()},
-            )
+            upsert(conn, geocode_cache, {"query_norm": key, "results": candidates, "fetched_at": now_iso()},
+                   "query_norm")
         return candidates[:limit]
 
     async def _nominatim(self, query: str, limit: int) -> list[dict]:

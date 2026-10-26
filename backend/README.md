@@ -29,6 +29,8 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 `--host 0.0.0.0` lets the frontend laptop on the same Wi-Fi reach `http://<this-laptop-ip>:8000`.
 
+**Database:** by default a local SQLite file (`DATABASE_PATH`), created automatically. To use Supabase PostgreSQL instead, set `DATABASE_URL` and apply the SQL migrations in `migrations/` with `python -m app.migrate`. See [`docs/SUPABASE_SETUP.md`](../docs/SUPABASE_SETUP.md) (setup, security rules, tests). `python -m app.seed` loads synthetic samples only when `DEMO_MODE=true`, and never runs automatically.
+
 ## Using Gemma 4
 
 By default `LLM_BACKEND=fake`: an offline keyword fallback with the same output format, so everything works without a model. Its output shows the model name `fake-heuristic`; it is not the product's AI.
