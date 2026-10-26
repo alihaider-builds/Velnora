@@ -1,6 +1,6 @@
 # ReliefLens backend (Module A)
 
-FastAPI service for ReliefLens: report intake (web form, SMS, WhatsApp, demo simulator), Gemma 4 extraction with evidence grounding, the priority list, map search, duplicate suggestions, review workflow and the privacy-filtered public API.
+FastAPI service for ReliefLens: report intake (web form, SMS, WhatsApp, demo simulator), Gemma 4 extraction with evidence grounding, a time-ordered review queue, map search, duplicate suggestions, review workflow and the privacy-filtered public API.
 
 Full spec: [`docs/BACKEND_TECH_SPEC.md`](../docs/BACKEND_TECH_SPEC.md) (§4 is the API contract the frontend uses).
 Interactive API docs while running: <http://localhost:8000/api/docs>
@@ -114,7 +114,6 @@ app/
     llm/                  Gemma via Ollama, offline fallback, prompt, output schema
     extraction.py         validate -> retry once -> evidence grounding
     evidence.py, normalize.py
-    priority.py           priority score (spec §17)
     duplicates.py         duplicate scoring with gates and reasons
     geocoding.py          Nominatim, cached, 1 request/s
     channels.py           one intake path for every channel, auto-reply text

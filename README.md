@@ -33,7 +33,7 @@ ReliefLens is a review workstation plus a public map.
 **Intake from every channel, one pipeline**
 - **SMS to an ordinary SIM** — the helpline phone runs the open-source [textbee](https://textbee.dev) app (or SMS Gateway for Android), which forwards each SMS to ReliefLens through a signed webhook. Tested end to end with a real SMS.
 - **WhatsApp and SMS via Twilio** webhooks (signature-verified), including photos.
-- **Web form** with offline **voice typing** (Whisper runs in the browser — no audio leaves the device), place suggestions as you type, map pin, and photo upload (location data stripped).
+- **Web form** with **voice typing** in Urdu or English: with the Whisper models installed it runs offline in the browser; otherwise the browser's own speech service is used. The dictation can be attached as a **voice note** (on by default, can be unticked) so the reviewer can listen and check the text. Also place suggestions as you type, map pin or pasted coordinates, and photo upload (location data stripped). A confirmation page shows the report's reference number.
 - **Helpline calls** — recorded, then transcribed (Gemma 4 audio when installed) or typed by the reviewer after listening.
 - An in-app **SMS / WhatsApp / call simulator** that uses exactly the same code path, for demos.
 
@@ -47,12 +47,28 @@ ReliefLens is a review workstation plus a public map.
 - A time-ordered queue (newest first) with search and need / channel / urgency filters — **the AI does not rank people's emergencies; reviewers set urgency**.
 - Location: place search (OpenStreetMap, or Google when a key is set) with broader-query fallback ("Lalkurti, Cantt, Rawalpindi" → "Cantt, Rawalpindi" → "Rawalpindi"), click-to-pin, drag, or paste coordinates / a Google Maps link. Approval requires a confirmed location.
 - **Duplicate detection** (text similarity, shared needs, distance, time, same sender) with a side-by-side compare and merge.
-- Approve, reject, flag, merge — every action is audited.
+- Approve, reject, flag, merge, set urgency and correct any AI field by hand; every action appears in the report's **history** (audit log). Keyboard shortcuts speed up reviewing.
+- Calls and web voice notes can be **played back** on the report; call transcripts can be typed or corrected by the reviewer.
 - Organizer dashboard: counts, **help categories** (add e.g. "Blankets / کمبل" with keywords; the AI uses them immediately), helpline numbers, and one-click SMS gateway connection.
+
+**Interface**
+- Urdu shown right-to-left in Nastaliq; light and dark themes follow the device; responsive from small phones to desktop; a demo banner marks synthetic data; the helpline number is shown in the header when set.
+- The frontend can run entirely on an in-browser **mock backend** (Mock Service Worker) for UI work without the server.
 
 **Sharing**
 - **Public map** of approved needs only — no text, no numbers, location rounded to ~1 km — with need filters.
 - **Downloads**: approved reports as **CSV** (Excel/Sheets, Urdu-safe) or **GeoJSON** (Google Earth/QGIS) for relief teams; a privacy-filtered open-data export for the public.
+
+### What has been tested live vs. only in automated tests
+
+| Tested in the running app | Implemented with automated tests, not yet tried live |
+|---|---|
+| Web form, review workflow, public map, dashboard, CSV/GeoJSON downloads | Twilio SMS, WhatsApp and voice-call webhooks |
+| Simulator (SMS, WhatsApp, call) | SMS Gateway for Android intake |
+| **Real SMS to the helpline SIM through textbee** | Reply SMS (textbee / gateway) |
+| Offline Whisper voice typing (synthetic speech) | Gemma 4 extraction through Ollama (the demo laptop uses the keyword fallback) |
+| OpenStreetMap place search and type-ahead | Gemma 4 audio transcription of calls |
+| Organizer categories used by the extractor | Google Geocoding / Places / Map Tiles (needs keys) |
 
 ## Architecture
 
@@ -215,10 +231,10 @@ Team **Velnora** — two members, one laptop each, working against a shared API 
 
 | Member | Contributions |
 |---|---|
-| **Ali Haider** ([@alihaider-builds](https://github.com/alihaider-builds)) — frontend | Repository and licence setup; React app skeleton and all screens; voice input on the submit page with offline Whisper voice typing and voice notes; report-submission improvements; mobile layout fixes. |
-| **KibroPixen** ([@KibroPixen](https://github.com/KibroPixen)) — backend & AI | Product brief, PRD and specs; FastAPI backend; Gemma 4 extraction with evidence grounding and schema validation; duplicate detection; geocoding; review workflow and privacy filter; SMS/WhatsApp/Twilio, textbee and SMS-gateway intake; helpline calls and transcription pipeline; help categories; exports; evaluation; integration, microphone/map fixes and UI clean-up. |
+| **Ali Haider** ([@alihaider-builds](https://github.com/alihaider-builds)) — frontend | Repository and licence; the React app and its core screens (public map, submit, simulator, review queue, report screen with evidence highlighting, location picker, duplicates and merge, dashboard, sign-in); design tokens and layout; mock backend; voice typing with offline Whisper and web voice notes (frontend and backend); frontend tests. About 8,800 lines, mostly `frontend/`. |
+| **KibroPixen** ([@KibroPixen](https://github.com/KibroPixen)) — backend & AI | Product brief, PRD and specs; the FastAPI backend (extraction with evidence grounding, duplicates, geocoding, review workflow, privacy filter, exports); SMS/WhatsApp/Twilio, textbee and SMS-gateway intake; helpline calls; help categories and helplines; evaluation; and frontend features on top of the app (call panel and simulator, category/helpline/SMS panels, place type-ahead, coordinates input, downloads, microphone and blank-map fixes, UI clean-up, responsive fixes). About 6,400 lines of backend and 2,800 of docs. |
 
-Commit history on GitHub shows each member's work.
+Line counts are additions on `main` from `git log --numstat`; the commit history shows each member's work.
 
 ## AI tools and Kiro
 
@@ -231,6 +247,8 @@ Commit history on GitHub shows each member's work.
 - SMS to a normal SIM needs an Android phone running textbee and a tunnel; a dedicated ReliefLens Android app with the gateway built in is planned.
 - SQLite suits a single deployment; a hosted database is the next step for multi-site use.
 - Not production-hardened: single shared reviewer password, no per-user roles yet.
+- The GitHub Actions backend job currently fails at the `pytest` step (Ubuntu, Python 3.12) although all 118 tests pass locally (Windows, Python 3.14); being investigated.
+- `docker-compose.yml` runs the backend only; there is no frontend Dockerfile yet, so use the `npm` steps above for the frontend.
 
 ## Contributing
 
