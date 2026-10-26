@@ -1,6 +1,5 @@
 import * as maplibregl from 'maplibre-gl'
 import type { Map as MLMap } from 'maplibre-gl'
-import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { MapPinOff } from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { BASEMAP_STYLE, PAKISTAN_CENTER, PAKISTAN_ZOOM } from '../lib/config'
@@ -12,8 +11,8 @@ import {
 } from '../lib/googleMaps'
 
 // MapLibre resolves its worker next to its own module, which Vite's dependency pre-bundling
-// moves; point it at the worker file explicitly so maps load in dev and production builds.
-maplibregl.setWorkerUrl(workerUrl)
+// moves; the worker is served unmodified at this path in dev and builds (see vite.config.ts).
+maplibregl.setWorkerUrl('/maplibre-gl-worker.mjs')
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const prefersReducedMotion = () =>

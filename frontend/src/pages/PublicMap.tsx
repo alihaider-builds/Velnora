@@ -5,8 +5,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { useNeeds, usePublicReports, usePublicStats } from '../api/hooks'
 import type { NeedCategory, PublicReport } from '../api/types'
-import { BarList } from '../components/BarList'
-import { NeedChip } from '../components/badges'
 import {
   cssVar,
   MapUnavailable,
@@ -30,7 +28,7 @@ function popupHtml(r: PublicReport, meta: (key: NeedCategory) => NeedMeta): stri
   const chips = r.needs
     .map((n) => {
       const m = meta(n)
-      return `<span style="display:inline-flex;align-items:center;gap:4px;border:1px solid ${cssVar(m.color)};border-radius:999px;padding:1px 8px;font-size:12px;font-weight:600;margin:0 4px 4px 0"><span style="width:8px;height:8px;border-radius:50%;background:${cssVar(m.color)}"></span>${escapeHtml(m.en)}</span>`
+      return `<span style="display:inline-flex;align-items:center;border:1px solid ${cssVar('var(--border)')};border-radius:999px;padding:1px 8px;font-size:12px;font-weight:500;margin:0 4px 4px 0">${escapeHtml(m.en)}</span>`
     })
     .join('')
   const demo = r.is_synthetic
@@ -228,23 +226,6 @@ export function PublicMap() {
   const items = useMemo(() => reports.data?.items ?? [], [reports.data])
   const filtered = needs.length > 0
 
-  // Unfiltered: counts from /public/stats. Filtered: only the selected needs, counted from the
-  // reports on the map, so the bars match the filter (US-17).
-  const counts = useMemo(() => {
-    if (!filtered) return stats.data?.by_need ?? {}
-    const out: Partial<Record<NeedCategory, number>> = {}
-    items.forEach((r) =>
-      r.needs.forEach((n) => {
-        if (needs.includes(n)) out[n] = (out[n] ?? 0) + 1
-      }),
-    )
-    return out
-  }, [filtered, needs, stats.data, items])
-  const barNeeds = filtered
-    ? needKeys.filter((n) => needs.includes(n))
-    : needKeys.filter((n) => (counts[n] ?? 0) > 0)
-  const barSum = barNeeds.reduce((sum, n) => sum + (counts[n] ?? 0), 0)
-
   const areas = useMemo(() => {
     if (!filtered) return stats.data?.by_area ?? []
     const m = new Map<string, number>()
@@ -254,6 +235,9 @@ export function PublicMap() {
       .sort((a, b) => b.count - a.count)
   }, [filtered, stats.data, items])
 
+  const allCounts: Partial<Record<NeedCategory, number>> = stats.data?.by_need ?? {}
+  const needRows = needKeys.filter((n) => (allCounts[n] ?? 0) > 0 || needs.includes(n))
+  const maxCount = Math.max(1, ...needRows.map((n) => allCounts[n] ?? 0))
   const total = filtered ? items.length : (stats.data?.total_approved ?? items.length)
   const loading = reports.isPending || stats.isPending
   const error = reports.error ?? stats.error
@@ -286,41 +270,62 @@ export function PublicMap() {
         )}
       </div>
 
-      <fieldset>
-        <legend className="eyebrow mb-2">Filter by need</legend>
-        <div className="flex flex-wrap gap-1.5">
-          {needKeys.map((n) => {
-            const on = needs.includes(n)
-            const m = needInfo(n)
-            const Icon = m.icon
-            return (
+      {stats.data && needRows.length > 0 && (
+        <section aria-labelledby={`${p}-needs`}>
+          <div className="mb-1 flex items-center justify-between">
+            <h2 id={`${p}-needs`} className="eyebrow">
+              Needs
+            </h2>
+            {filtered && (
               <button
-                key={n}
                 type="button"
-                aria-pressed={on}
-                onClick={() => setNeeds((cur) => (on ? cur.filter((x) => x !== n) : [...cur, n]))}
-                className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3 text-sm font-medium ${
-                  on
-                    ? 'border-primary bg-surface-2 text-primary'
-                    : 'border-border bg-surface hover:bg-surface-2'
-                }`}
+                className="link inline-flex min-h-11 items-center px-1 text-sm"
+                onClick={() => setNeeds([])}
               >
-                <Icon size={14} aria-hidden="true" style={{ color: m.color }} />
-                {m.en}
+                Show all
               </button>
-            )
-          })}
-          {filtered && (
-            <button
-              type="button"
-              className="link inline-flex min-h-11 items-center px-2 text-sm"
-              onClick={() => setNeeds([])}
-            >
-              Clear
-            </button>
-          )}
-        </div>
-      </fieldset>
+            )}
+          </div>
+          <ul className="flex flex-col">
+            {needRows.map((n) => {
+              const on = needs.includes(n)
+              const m = needInfo(n)
+              const Icon = m.icon
+              const value = allCounts[n] ?? 0
+              return (
+                <li key={n}>
+                  <button
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() =>
+                      setNeeds((cur) => (on ? cur.filter((x) => x !== n) : [...cur, n]))
+                    }
+                    className={`grid min-h-11 w-full grid-cols-[minmax(6.5rem,auto)_1fr_2rem] items-center gap-3 rounded-lg px-2 text-left text-sm ${
+                      on ? 'bg-surface-2 font-semibold text-primary' : 'hover:bg-surface-2'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Icon size={15} aria-hidden="true" style={{ color: m.color }} />
+                      {m.en}
+                    </span>
+                    <span className="h-2 rounded-full bg-surface-2" aria-hidden="true">
+                      <span
+                        className="block h-full rounded-full"
+                        style={{
+                          width: `${(value / maxCount) * 100}%`,
+                          minWidth: value ? 4 : 0,
+                          backgroundColor: m.color,
+                        }}
+                      />
+                    </span>
+                    <span className="text-right tabular-nums">{value}</span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      )}
 
       {error ? (
         <ErrorState
@@ -349,26 +354,6 @@ export function PublicMap() {
         </EmptyState>
       ) : (
         <>
-          <section aria-labelledby={`${p}-by-need`}>
-            <h2 id={`${p}-by-need`} className="eyebrow mb-2">
-              Reports by need
-            </h2>
-            <BarList
-              label="Approved reports by need"
-              items={barNeeds.map((n) => ({
-                key: n,
-                label: <NeedChip need={n} bilingual />,
-                value: counts[n] ?? 0,
-                color: needInfo(n).color,
-              }))}
-            />
-            {barSum > total && (
-              <p className="mt-2 text-xs text-muted">
-                A report can list more than one need, so these counts add up to more than {total}.
-              </p>
-            )}
-          </section>
-
           <section aria-labelledby={`${p}-top-areas`}>
             <h2 id={`${p}-top-areas`} className="eyebrow mb-2">
               Top areas

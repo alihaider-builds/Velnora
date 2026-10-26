@@ -45,10 +45,6 @@ const isTyping = (el: EventTarget | null) =>
   el instanceof HTMLElement &&
   (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))
 
-function toggle<T>(list: T[], value: T): T[] {
-  return list.includes(value) ? list.filter((v) => v !== value) : [...list, value]
-}
-
 function Row({
   item,
   selected,
@@ -319,9 +315,9 @@ export function ReviewQueue() {
         </ul>
       </nav>
 
-      {/* Search, filters, sort */}
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="relative min-w-56 flex-1">
+      {/* Search, filters, sort: one row of plain dropdowns */}
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))]">
+        <div className="relative col-span-2 lg:col-span-1">
           <label htmlFor="queue-search" className="sr-only">
             Search reports
           </label>
@@ -335,84 +331,73 @@ export function ReviewQueue() {
             type="search"
             dir="auto"
             className="input pl-9"
-            placeholder="Search report text"
+            placeholder="Search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div>
-          <label htmlFor="filter-need" className="text-xs font-semibold text-muted">
-            Need
-          </label>
-          <select
-            id="filter-need"
-            className="input"
-            value={need ?? ''}
-            onChange={(e) => update({ need: e.target.value || undefined })}
-          >
-            <option value="">All needs</option>
-            {needKeys.map((n) => (
-              <option key={n} value={n}>
-                {meta(n).en}
-              </option>
-            ))}
-          </select>
-        </div>
-        <fieldset>
-          <legend className="text-xs font-semibold text-muted">Channel</legend>
-          <div className="flex flex-wrap gap-1">
-            {CHANNEL_ORDER.map((c) => {
-              const Icon = CHANNELS[c].icon
-              const active = channels.includes(c)
-              return (
-                <button
-                  key={c}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => update({ channel: toggle(channels, c) })}
-                  className={`btn btn-sm min-h-11 ${active ? 'border-primary bg-surface-2 text-primary' : ''}`}
-                >
-                  <Icon size={15} aria-hidden="true" /> {CHANNELS[c].label}
-                </button>
-              )
-            })}
-          </div>
-        </fieldset>
-        <fieldset>
-          <legend className="text-xs font-semibold text-muted">Your urgency</legend>
-          <div className="flex flex-wrap gap-1">
-            {URGENCY_FILTERS.map((u) => {
-              const active = urgencies.includes(u)
-              return (
-                <button
-                  key={u}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => update({ urgency: toggle(urgencies, u) })}
-                  className={`btn btn-sm min-h-11 ${active ? 'border-primary bg-surface-2 text-primary' : ''}`}
-                >
-                  {u === 'unknown' ? 'Not set' : URGENCY_LABEL[u]}
-                </button>
-              )
-            })}
-          </div>
-        </fieldset>
-        <div>
-          <label htmlFor="sort" className="text-xs font-semibold text-muted">
-            Order
-          </label>
-          <select
-            id="sort"
-            className="input"
-            value={sort}
-            onChange={(e) =>
-              update({ sort: e.target.value === 'newest' ? undefined : e.target.value })
-            }
-          >
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-          </select>
-        </div>
+        <label className="sr-only" htmlFor="filter-need">
+          Need
+        </label>
+        <select
+          id="filter-need"
+          className="input"
+          value={need ?? ''}
+          onChange={(e) => update({ need: e.target.value || undefined })}
+        >
+          <option value="">All needs</option>
+          {needKeys.map((n) => (
+            <option key={n} value={n}>
+              {meta(n).en}
+            </option>
+          ))}
+        </select>
+        <label className="sr-only" htmlFor="filter-channel">
+          Channel
+        </label>
+        <select
+          id="filter-channel"
+          className="input"
+          value={channels[0] ?? ''}
+          onChange={(e) => update({ channel: e.target.value ? [e.target.value] : undefined })}
+        >
+          <option value="">All channels</option>
+          {CHANNEL_ORDER.map((c) => (
+            <option key={c} value={c}>
+              {CHANNELS[c].label}
+            </option>
+          ))}
+        </select>
+        <label className="sr-only" htmlFor="filter-urgency">
+          Urgency
+        </label>
+        <select
+          id="filter-urgency"
+          className="input"
+          value={urgencies[0] ?? ''}
+          onChange={(e) => update({ urgency: e.target.value ? [e.target.value] : undefined })}
+        >
+          <option value="">Any urgency</option>
+          {URGENCY_FILTERS.map((u) => (
+            <option key={u} value={u}>
+              {u === 'unknown' ? 'Urgency not set' : URGENCY_LABEL[u]}
+            </option>
+          ))}
+        </select>
+        <label className="sr-only" htmlFor="sort">
+          Order
+        </label>
+        <select
+          id="sort"
+          className="input"
+          value={sort}
+          onChange={(e) =>
+            update({ sort: e.target.value === 'newest' ? undefined : e.target.value })
+          }
+        >
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+        </select>
       </div>
 
       <section aria-label="Reports" className="card overflow-hidden">

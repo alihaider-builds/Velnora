@@ -1,8 +1,8 @@
-import { Camera, MapPin, Mic, Phone, Send, Trash2, X } from 'lucide-react'
+import { Camera, MapPin, Mic, Send, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { ApiError } from '../api/client'
-import { useDemoMode, useHelplines, useSubmitReport } from '../api/hooks'
+import { useDemoMode, useSubmitReport } from '../api/hooks'
 import { CoordinateInput } from '../components/CoordinateInput'
 import { Dialog } from '../components/Dialog'
 import { MapView, type MapMarker } from '../components/MapView'
@@ -10,7 +10,7 @@ import { PlaceAutocomplete } from '../components/PlaceAutocomplete'
 import { Spinner } from '../components/ui'
 import { VoiceInput } from '../components/VoiceInput'
 import { PAKISTAN_BOUNDS } from '../lib/config'
-import { formatCoords, formatPhone } from '../lib/format'
+import { formatCoords } from '../lib/format'
 import { codePoints } from '../lib/text'
 import { encodeWav } from '../lib/wav'
 
@@ -139,7 +139,6 @@ export function Submit() {
   const navigate = useNavigate()
   const demoMode = useDemoMode()
   const submit = useSubmitReport()
-  const helplines = useHelplines().data?.items ?? []
 
   const [text, setText] = useState('')
   const [place, setPlace] = useState('')
@@ -490,18 +489,6 @@ export function Submit() {
               </p>
             )}
           </div>
-
-          {helplines.length > 0 && (
-            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-              <Phone size={15} aria-hidden="true" className="text-primary" />
-              <span className="text-muted">Prefer to talk? Call</span>
-              {helplines.map((h) => (
-                <a key={h.number} href={`tel:${h.number}`} dir="ltr" className="link font-mono">
-                  {formatPhone(h.number)}
-                </a>
-              ))}
-            </p>
-          )}
         </div>
 
         {/* Submit bar spans both columns */}

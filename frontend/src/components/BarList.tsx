@@ -4,7 +4,8 @@ export interface BarItem {
   key: string
   label: ReactNode
   value: number
-  color: string
+  /** Defaults to the accent colour. */
+  color?: string
 }
 
 /**
@@ -28,7 +29,7 @@ export function BarList({ items, label }: { items: BarItem[]; label: string }) {
               style={{
                 width: `${(i.value / max) * 100}%`,
                 minWidth: i.value ? 4 : 0,
-                backgroundColor: i.color,
+                backgroundColor: i.color ?? 'var(--primary)',
               }}
             />
           </span>

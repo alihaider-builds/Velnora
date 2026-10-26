@@ -1,7 +1,8 @@
-import { LogOut, Menu, X } from 'lucide-react'
+import { LogOut, Menu, Phone, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router'
-import { useLogout, useMe } from '../api/hooks'
+import { useHelplines, useLogout, useMe } from '../api/hooks'
+import { formatPhone } from '../lib/format'
 import { Logo } from './Logo'
 
 function navClass({ isActive }: { isActive: boolean }) {
@@ -9,6 +10,26 @@ function navClass({ isActive }: { isActive: boolean }) {
     'inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium',
     isActive ? 'bg-surface-2 text-primary' : 'text-text hover:bg-surface-2',
   ].join(' ')
+}
+
+/** The active helpline number(s), tappable to call. Shown in the header on every page. */
+function HelplineLink() {
+  const lines = useHelplines().data?.items ?? []
+  if (!lines.length) return null
+  const h = lines[0]
+  return (
+    <a
+      href={`tel:${h.number}`}
+      className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-text hover:bg-surface-2"
+      aria-label={`Call the helpline ${formatPhone(h.number)}`}
+    >
+      <Phone size={15} aria-hidden="true" className="text-primary" />
+      <span className="hidden text-muted sm:inline">Helpline</span>
+      <span dir="ltr" className="tabular-nums">
+        {formatPhone(h.number)}
+      </span>
+    </a>
+  )
 }
 
 /** Header on every page (UI_UX_SPEC §4); collapses into a menu below 768 px. */
@@ -70,12 +91,8 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-surface/95 backdrop-blur">
-      <div
-        aria-hidden="true"
-        className="h-[3px]"
-        style={{ background: 'linear-gradient(90deg, var(--primary), var(--ai), var(--verified))' }}
-      />
-      <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-4 py-2">
+      <div aria-hidden="true" className="h-[3px] bg-[var(--primary)]" />
+      <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-x-4 px-4 py-2">
         <Link
           to="/"
           className="flex min-h-11 items-center rounded-lg"
@@ -84,9 +101,13 @@ export function Header() {
           <Logo />
         </Link>
 
-        <nav aria-label="Main" className="hidden md:block">
-          <ul className="flex items-center gap-1">{links}</ul>
-        </nav>
+        {/* On small phones the helpline gets its own line below the logo, so nothing is cut off. */}
+        <div className="order-last -ml-3 flex w-full items-center gap-1 sm:order-none sm:ml-auto sm:w-auto">
+          <HelplineLink />
+          <nav aria-label="Main" className="hidden border-l border-border pl-1 md:block">
+            <ul className="flex items-center gap-1">{links}</ul>
+          </nav>
+        </div>
 
         <button
           type="button"

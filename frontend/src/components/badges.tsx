@@ -59,14 +59,8 @@ export function NeedChip({
   const m = useNeeds().meta(need)
   const Icon = m.icon
   return (
-    <span
-      className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium text-text whitespace-nowrap"
-      style={{
-        borderColor: `color-mix(in srgb, ${m.color} 45%, transparent)`,
-        backgroundColor: `color-mix(in srgb, ${m.color} 10%, var(--surface))`,
-      }}
-    >
-      <Icon size={13} aria-hidden="true" style={{ color: m.color }} />
+    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5 text-xs font-medium text-text whitespace-nowrap">
+      <Icon size={13} aria-hidden="true" className="text-muted" />
       {m.en}
       {bilingual && m.ur && (
         <span

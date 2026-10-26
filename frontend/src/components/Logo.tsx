@@ -29,7 +29,7 @@ export function LogoMark({ size = 32, className }: { size?: number; className?: 
   )
 }
 
-export function Logo({ showTagline = true }: { showTagline?: boolean }) {
+export function Logo({ showTagline = false }: { showTagline?: boolean }) {
   return (
     <span className="flex items-center gap-2.5">
       <LogoMark size={34} />
