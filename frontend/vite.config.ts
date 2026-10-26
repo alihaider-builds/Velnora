@@ -1,8 +1,9 @@
 /// <reference types="vitest/config" />
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { join } from 'node:path'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 
 // MapLibre's web worker must reach the browser untouched. Served through Vite's dev pipeline it
@@ -27,36 +28,27 @@ function maplibreWorker(): Plugin {
 
 // `npm run build:standalone`: inline the single JS bundle and stylesheet into the HTML so the
 // whole app is one file (dist-standalone/relieflens-demo.html) that opens from disk.
-function singleFileHtml(): Plugin {
+// Runs after Vite has written its files (so its own placeholders are already filled in).
+function singleFileHtml(outDir: string): Plugin {
   return {
     name: 'relieflens-single-file',
-    enforce: 'post',
-    generateBundle(_options, bundle) {
-      const html = bundle['index.html']
-      if (!html || html.type !== 'asset') return
-      let page = String(html.source)
-      for (const [name, item] of Object.entries(bundle)) {
-        if (item.type === 'chunk' && item.isEntry) {
-          const code = item.code.replace(/<\/script/gi, '<\\/script')
-          page = page.replace(
-            new RegExp(
-              `<script[^>]*src="[^"]*${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*></script>`,
-            ),
-            () => `<script type="module">${code}</script>`,
-          )
-        } else if (item.type === 'asset' && name.endsWith('.css')) {
-          page = page.replace(
-            new RegExp(
-              `<link[^>]*href="[^"]*${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*>`,
-            ),
-            () => `<style>${String(item.source)}</style>`,
-          )
-        }
-      }
+    apply: 'build',
+    closeBundle() {
+      const read = (p: string) => readFileSync(join(outDir, p), 'utf8')
+      let page = read('index.html')
+      page = page.replace(/<script[^>]*src="\.\/([^"]+)"[^>]*><\/script>/g, (_m, src: string) => {
+        const code = read(src).replace(/<\/script/gi, '<\\/script')
+        return `<script type="module">${code}</script>`
+      })
+      page = page.replace(
+        /<link[^>]*rel="stylesheet"[^>]*href="\.\/([^"]+)"[^>]*>/g,
+        (_m, href: string) => `<style>${read(href)}</style>`,
+      )
       const favicon = readFileSync('public/favicon.svg').toString('base64')
       page = page.replace(/href="[^"]*favicon\.svg"/, `href="data:image/svg+xml;base64,${favicon}"`)
-      for (const name of Object.keys(bundle)) delete bundle[name]
-      this.emitFile({ type: 'asset', fileName: 'relieflens-demo.html', source: page })
+      for (const name of readdirSync(outDir))
+        rmSync(join(outDir, name), { recursive: true, force: true })
+      writeFileSync(join(outDir, 'relieflens-demo.html'), page)
     },
   }
 }
@@ -67,7 +59,7 @@ export default defineConfig(({ mode }) => {
     return {
       base: './',
       publicDir: false, // the one file needs nothing from public/ (offline voice models stay out)
-      plugins: [react(), tailwindcss(), singleFileHtml()],
+      plugins: [react(), tailwindcss(), singleFileHtml('dist-standalone')],
       build: {
         outDir: 'dist-standalone',
         emptyOutDir: true,
