@@ -33,6 +33,7 @@ import { UserText } from '../components/UserText'
 import { EmptyState, ErrorState, Skeleton } from '../components/ui'
 import { exactTime, relativeTime } from '../lib/format'
 import { CHANNEL_ORDER, CHANNELS, URGENCY_LABEL } from '../lib/meta'
+import { DownloadApproved } from '../components/DownloadApproved'
 
 const URGENCY_FILTERS: Urgency[] = ['high', 'medium', 'low', 'unknown']
 
@@ -291,6 +292,7 @@ export function ReviewQueue() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <DownloadApproved scope="review" />
           <Link to="/review/dashboard" className="btn btn-sm">
             <LayoutDashboard size={15} aria-hidden="true" /> Dashboard
           </Link>

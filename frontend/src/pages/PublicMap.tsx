@@ -17,6 +17,7 @@ import {
 import { EmptyState, ErrorState, Skeleton } from '../components/ui'
 import { relativeTime } from '../lib/format'
 import { NEED_ORDER, NEEDS, type NeedMeta } from '../lib/meta'
+import { DownloadApproved } from '../components/DownloadApproved'
 
 const SOURCE = 'public-reports'
 
@@ -406,6 +407,9 @@ export function PublicMap() {
           <ShieldCheck size={15} aria-hidden="true" className="shrink-0 text-verified" />
           Only reviewer-approved reports appear. Locations are approximate (about 1 km).
         </p>
+        <div>
+          <DownloadApproved scope="public" />
+        </div>
         <p>
           Map:{' '}
           <a className="link" href="https://openfreemap.org" target="_blank" rel="noreferrer">

@@ -4,7 +4,7 @@ from collections import Counter
 from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Query, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy import delete, insert, select, update
 
 from app import repo
@@ -26,7 +26,7 @@ from app.schemas import (
     SubmitResponse,
     TranscriptRequest,
 )
-from app.services import audit, categories
+from app.services import audit, categories, export
 from app.services.channels import create_report
 from app.services.jobs import set_transcript
 from app.services.storage import ImageRejected, delete_image, media_type, save_audio, save_image
@@ -127,6 +127,24 @@ async def submit_report(
 
 
 # ---------- reviewer: reading ----------
+
+
+@router.get("/reports/export", dependencies=reviewer)
+def export_approved(request: Request, format: Literal["csv", "geojson"] = "csv"):
+    """Approved reports for relief teams: CSV for spreadsheets, GeoJSON for maps. No sender numbers."""
+    with request.app.state.engine.connect() as conn:
+        rows = export.reviewer_rows(conn)
+        audit.record(conn, "export", "export_approved", details={"format": format, "rows": len(rows)})
+        conn.commit()
+    stamp = now_iso()[:10]
+    if format == "geojson":
+        body, media = export.to_geojson(rows), "application/geo+json"
+    else:
+        body, media = export.to_csv(rows, export.REVIEWER_COLUMNS), "text/csv; charset=utf-8"
+    return Response(body, media_type=media, headers={
+        "Content-Disposition": f'attachment; filename="relieflens-approved-{stamp}.{format}"',
+        "Cache-Control": "private, no-store",
+    })
 
 
 @router.get("/reports", response_model=ReportList, dependencies=reviewer)
