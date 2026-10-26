@@ -16,7 +16,7 @@ TEXT = "Lalkurti Cantt Rawalpindi mein pani bhar gaya hai, 3 bachay hain, dawai 
 
 def event(text=TEXT, sender="+923004445566", envelope="Ey6ECgOkVVFjz3CL48B8C", kind="sms:received"):
     return {"deviceId": "dev1", "event": kind, "id": envelope, "webhookId": "wh1",
-            "payload": {"messageId": "abc123", "message": text, "sender": sender, "recipient": "+923260175097",
+            "payload": {"messageId": "abc123", "message": text, "sender": sender, "recipient": "+923000000100",
                         "simNumber": 1, "receivedAt": "2026-10-26T15:46:11.000+05:00"}}
 
 
@@ -35,7 +35,7 @@ def app_client(tmp_path, **overrides):
 def test_forwarded_sms_becomes_queue_report(tmp_path):
     with app_client(tmp_path) as c:
         c.post("/api/auth/login", json={"password": PASSWORD})
-        c.post("/api/helplines", json={"number": "+92 326 0175097", "label": "ReliefLens helpline"})
+        c.post("/api/helplines", json={"number": "+92 300 0000100", "label": "ReliefLens helpline"})
         resp = post(c, event())
         assert resp.status_code == 200 and resp.json()["reference"].startswith("RL-")
         assert post(c, event()).json()["duplicate"] is True  # gateway retry reuses the envelope id

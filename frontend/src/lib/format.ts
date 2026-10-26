@@ -34,7 +34,7 @@ export function pluralize(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`
 }
 
-/** '+923260175097' -> '+92 326 0175097'; other numbers are returned unchanged. */
+/** '+923000000100' -> '+92 300 0000100'; other numbers are returned unchanged. */
 export function formatPhone(number: string): string {
   const m = /^\+92(\d{3})(\d{7})$/.exec(number)
   return m ? `+92 ${m[1]} ${m[2]}` : number
