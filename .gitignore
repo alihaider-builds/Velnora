@@ -1,0 +1,36 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Backend runtime data (database, uploads)
+backend/storage/
+*.db
+*.db-wal
+*.db-shm
+
+# Models
+models/
+*.gguf
+
+# Frontend
+node_modules/
+frontend/dist/
+frontend/.env.local
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local tooling
+.claude/
