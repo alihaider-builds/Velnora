@@ -194,7 +194,8 @@ cd backend && python ../eval/run_eval.py     # writes eval/results.md (model fro
 
 ## Demo
 
-**Demo video:** _link to be added_
+**Demo video:** 
+https://drive.google.com/file/d/11SvVu9QekSZ4j6XjO4wV8Nq2MtMBuNPj/view?usp=sharing
 
 **Screenshots:** see [`docs/screenshots/`](docs/screenshots/) (map, submit form, review queue, report with evidence, dashboard).
 <img width="957" height="446" alt="Screenshot 2026-10-26 215705" src="https://github.com/user-attachments/assets/fc0373df-4a72-4027-9450-cf6892e66cc3" />
