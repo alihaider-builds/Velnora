@@ -130,12 +130,14 @@ export function Simulator() {
   return (
     <div className="mx-auto grid w-full max-w-5xl items-start gap-8 sm:px-4 sm:py-8 lg:grid-cols-[1fr_380px]">
       <section className="order-2 px-4 pb-8 sm:px-0 lg:order-1 lg:pt-6">
+        <p className="eyebrow">Developer tool · development builds only</p>
         <h1 className="text-3xl font-bold tracking-tight">Helpline simulator</h1>
         <div className="mt-4 flex gap-3 rounded-lg border border-border bg-surface p-4">
           <Info size={18} aria-hidden="true" className="mt-0.5 shrink-0 text-primary" />
           <p>
-            Simulated phone. SMS, WhatsApp messages and recorded calls go through the same path as
-            real ones. Demo data only.
+            For testing only. Nothing here is a real SMS, WhatsApp message or phone call: the
+            simulated messages are fed into the same backend path a real provider integration would
+            use, and are stored as synthetic demo data.
           </p>
         </div>
         <ol className="mt-6 flex flex-col gap-3 text-sm">

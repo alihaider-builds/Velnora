@@ -113,6 +113,13 @@ class CallInfo(BaseModel):
     transcript_error: str | None
 
 
+class VoiceNote(BaseModel):
+    """A web report's voice recording (the submitter dictated the text). Reviewer-only."""
+
+    audio_url: str
+    duration_seconds: float | None
+
+
 class DuplicateSummary(BaseModel):
     created_at: str
     needs: list[NeedCategory]
@@ -145,6 +152,7 @@ class Report(BaseModel):
     channel: Channel
     sender: Sender | None
     call: CallInfo | None
+    voice_note: VoiceNote | None = None
     source_text: str
     masked_text: str
     has_image: bool
@@ -171,6 +179,7 @@ class ReportListItem(BaseModel):
     place: str | None
     extraction_status: ExtractionStatus
     transcript_status: TranscriptStatus | None
+    has_voice_note: bool = False
     status: ReportStatus
     urgency: Urgency
     duplicate_count: int

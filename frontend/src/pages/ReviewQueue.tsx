@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Loader2,
   MapPin,
+  Mic,
   Search,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -142,6 +143,11 @@ function Row({
             <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs font-medium">
               <Copy size={12} aria-hidden="true" />
               {item.duplicate_count} possible duplicate{item.duplicate_count > 1 ? 's' : ''}
+            </span>
+          )}
+          {item.has_voice_note && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-surface px-2 py-0.5 text-xs font-medium text-primary">
+              <Mic size={12} aria-hidden="true" /> Voice note
             </span>
           )}
         </div>

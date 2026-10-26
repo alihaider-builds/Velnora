@@ -349,6 +349,7 @@ export function toListItem(r: Report): ReportListItem {
     place: effectivePlace(r),
     extraction_status: r.extraction.status,
     transcript_status: r.call?.transcript_status ?? null,
+    has_voice_note: !!r.voice_note,
     status: r.status,
     urgency: r.urgency,
     duplicate_count: r.duplicate_count,

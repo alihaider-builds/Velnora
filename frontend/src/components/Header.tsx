@@ -1,7 +1,7 @@
 import { LogOut, Menu, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router'
-import { useDemoMode, useLogout, useMe } from '../api/hooks'
+import { useLogout, useMe } from '../api/hooks'
 import { Logo } from './Logo'
 
 function navClass({ isActive }: { isActive: boolean }) {
@@ -13,7 +13,6 @@ function navClass({ isActive }: { isActive: boolean }) {
 
 /** Header on every page (UI_UX_SPEC §4); collapses into a menu below 768 px. */
 export function Header() {
-  const demoMode = useDemoMode()
   const { data: me } = useMe()
   const logout = useLogout()
   const navigate = useNavigate()
@@ -49,13 +48,6 @@ export function Header() {
           Submit a report
         </NavLink>
       </li>
-      {demoMode && (
-        <li>
-          <NavLink to="/simulator" className={navClass}>
-            Simulator
-          </NavLink>
-        </li>
-      )}
       <li>
         <NavLink to="/review" className={navClass}>
           Review

@@ -5,6 +5,12 @@
 const TARGET_RATE = 16_000
 
 export async function toWav16k(input: Blob): Promise<{ wav: Blob; seconds: number }> {
+  const { samples, seconds } = await toMono16k(input)
+  return { wav: encodeWav(samples, TARGET_RATE), seconds }
+}
+
+/** Decodes audio to 16 kHz mono float samples (what Whisper expects). */
+export async function toMono16k(input: Blob): Promise<{ samples: Float32Array; seconds: number }> {
   const bytes = await input.arrayBuffer()
   const ctx = new AudioContext()
   let decoded: AudioBuffer
@@ -20,10 +26,11 @@ export async function toWav16k(input: Blob): Promise<{ wav: Blob; seconds: numbe
   src.connect(offline.destination) // multi-channel input is mixed down to mono
   src.start()
   const rendered = await offline.startRendering()
-  return { wav: encodeWav(rendered.getChannelData(0), TARGET_RATE), seconds: decoded.duration }
+  return { samples: rendered.getChannelData(0), seconds: decoded.duration }
 }
 
-function encodeWav(samples: Float32Array, rate: number): Blob {
+/** 16-bit PCM mono WAV from float samples in [-1, 1]. */
+export function encodeWav(samples: Float32Array, rate: number): Blob {
   const buf = new ArrayBuffer(44 + samples.length * 2)
   const v = new DataView(buf)
   const str = (o: number, s: string) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)))

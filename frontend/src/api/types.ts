@@ -150,6 +150,12 @@ export interface AuditEntry {
 }
 
 /** Reviewer view of a report. */
+/** A web report's voice recording (the submitter dictated the text). Reviewer-only. */
+export interface VoiceNote {
+  audio_url: string
+  duration_seconds: number | null
+}
+
 export interface Report {
   id: string
   reference: string
@@ -159,6 +165,7 @@ export interface Report {
   channel: Channel
   sender: Sender | null
   call: CallInfo | null
+  voice_note?: VoiceNote | null
   source_text: string
   masked_text: string
   has_image: boolean
@@ -186,6 +193,7 @@ export interface ReportListItem {
   place: string | null
   extraction_status: ExtractionStatus
   transcript_status: TranscriptStatus | null
+  has_voice_note?: boolean
   status: ReportStatus
   urgency: Urgency
   duplicate_count: number

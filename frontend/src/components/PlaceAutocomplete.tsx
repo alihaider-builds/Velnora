@@ -35,7 +35,13 @@ export function PlaceAutocomplete({
 
   const query = usePlaceSuggestions(open ? debounced : '')
   const items = query.data?.items ?? []
-  const show = open && value.trim().length >= 3 && (items.length > 0 || query.isFetching)
+  const searched = debounced.trim().length >= 3 && debounced === value
+  const noMatches = searched && query.isSuccess && !query.isFetching && items.length === 0
+  const failed = searched && query.isError && !query.isFetching
+  const show =
+    open &&
+    value.trim().length >= 3 &&
+    (items.length > 0 || query.isFetching || noMatches || failed)
 
   const pick = (s: PlaceSuggestion) => {
     onSelect(s)
@@ -119,6 +125,16 @@ export function PlaceAutocomplete({
           {query.isFetching && items.length === 0 && (
             <li className="flex items-center gap-2 px-3 py-2 text-sm text-muted">
               <Loader2 size={14} className="animate-spin" aria-hidden="true" /> Searching…
+            </li>
+          )}
+          {noMatches && (
+            <li className="px-3 py-2 text-sm text-muted">
+              No matching places. Keep your own wording, or pick the spot on the map.
+            </li>
+          )}
+          {failed && (
+            <li role="alert" className="px-3 py-2 text-sm text-flagged">
+              Place search is unavailable right now. Type the place name, or pick it on the map.
             </li>
           )}
           <li aria-hidden="true" className="px-3 pt-1 text-right text-[11px] text-muted">

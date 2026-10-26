@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Offline voice-typing model (downloaded by `npm run setup:voice`; ~77–240 MB)
+public/models/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

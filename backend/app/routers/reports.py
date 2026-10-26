@@ -29,7 +29,8 @@ from app.schemas import (
 from app.services import audit, categories
 from app.services.channels import create_report
 from app.services.jobs import set_transcript
-from app.services.storage import ImageRejected, delete_image, media_type, save_image
+from app.services.storage import ImageRejected, delete_image, media_type, save_audio, save_image
+from app.services.transcription import AudioRejected
 from app.timeutil import now_iso, utcnow
 
 router = APIRouter(prefix="/api", tags=["reports"])
@@ -78,8 +79,11 @@ async def submit_report(
     lat: float | None = Form(None),
     lng: float | None = Form(None),
     image: UploadFile | None = File(None),
+    audio: UploadFile | None = File(None),
     is_synthetic: bool | None = Form(None),
 ):
+    """`audio` is an optional voice note (16 kHz mono WAV) the submitter recorded while dictating
+    the text; it is stored privately so a reviewer can listen and check the text."""
     _submit_limit.check(request, "Too many reports from this connection. Try again in a minute.")
     settings = request.app.state.settings
     fields = []
@@ -103,9 +107,20 @@ async def submit_report(
         except ImageRejected as exc:
             raise APIError(exc.status, exc.code, exc.message) from exc
 
+    audio_name, audio_seconds = None, None
+    if audio is not None and audio.filename:
+        data = await audio.read(settings.max_audio_bytes + 1)
+        upload_dir = settings.resolve(settings.upload_dir)
+        try:
+            audio_name, audio_seconds = save_audio(data, upload_dir, settings)
+        except AudioRejected as exc:
+            delete_image(upload_dir, image_name)  # don't keep a photo for a rejected report
+            raise APIError(exc.status, exc.code, exc.message) from exc
+
     created = create_report(
         request.app.state.engine, settings, channel="web", text=text, place_text=place_text,
         lat=lat, lng=lng, image_name=image_name, is_synthetic=is_synthetic,
+        audio_name=audio_name, call_seconds=audio_seconds,
     )
     schedule_extraction(request, background, created.report_id)
     return {"id": created.report_id, "reference": created.reference, "status": "pending_review"}

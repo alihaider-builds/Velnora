@@ -137,6 +137,14 @@ def call_obj(b: Bundle) -> dict | None:
     }
 
 
+def voice_note_obj(b: Bundle) -> dict | None:
+    """Web reports can carry the submitter's voice recording (calls use `call_obj`)."""
+    r = b.report
+    if r["channel"] == "call" or not r["audio_path"]:
+        return None
+    return {"audio_url": f"/api/reports/{r['id']}/audio", "duration_seconds": r["call_duration_seconds"]}
+
+
 def duplicates_for(b: Bundle, all_bundles: list[Bundle], settings: Settings) -> list[tuple[str, float, list[str]]]:
     if b.report["status"] in ("rejected", "merged"):
         return []
@@ -227,6 +235,7 @@ def build_report(conn: Connection, b: Bundle, settings: Settings, now: datetime)
         "channel": r["channel"],
         "sender": sender,
         "call": call_obj(b),
+        "voice_note": voice_note_obj(b),
         "source_text": r["source_text"],
         "masked_text": r["masked_text"],
         "has_image": bool(r["image_path"]),
@@ -256,6 +265,7 @@ def build_list_item(b: Bundle, all_b: list[Bundle], settings: Settings, now: dat
         "place": b.effective_place(),
         "extraction_status": b.ext_status,
         "transcript_status": r["transcript_status"],
+        "has_voice_note": voice_note_obj(b) is not None,
         "status": r["status"],
         "urgency": r["urgency"],
         "duplicate_count": len(duplicates_for(b, all_b, settings)),

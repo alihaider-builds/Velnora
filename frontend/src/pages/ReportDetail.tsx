@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Eye, Keyboard, MapPin, Users } from 'lucide-react'
+import { ArrowLeft, Eye, Keyboard, MapPin, Mic, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { api, ApiError } from '../api/client'
@@ -401,6 +401,32 @@ function ReportDetailView({ id }: { id: string }) {
             >
               <Eye size={14} aria-hidden="true" /> Reveal original
             </button>
+          )}
+
+          {report.voice_note && (
+            <div className="rounded-lg border border-border bg-surface-2 px-3 py-2">
+              <p className="flex items-center gap-1.5 text-sm font-semibold">
+                <Mic size={15} aria-hidden="true" className="text-primary" />
+                Submitter's voice note
+                {report.voice_note.duration_seconds != null && (
+                  <span className="font-normal text-muted">
+                    · {Math.floor(report.voice_note.duration_seconds / 60)}:
+                    {String(Math.round(report.voice_note.duration_seconds % 60)).padStart(2, '0')}
+                  </span>
+                )}
+              </p>
+              <audio
+                controls
+                preload="none"
+                src={report.voice_note.audio_url}
+                aria-label="Play the submitter's voice note"
+                className="mt-1 w-full"
+              />
+              <p className="mt-1 text-xs text-muted">
+                The text above was dictated from this recording on the submitter's device and may
+                have been edited before sending. Listen to confirm it matches.
+              </p>
+            </div>
           )}
 
           {report.has_image && report.image_url && (

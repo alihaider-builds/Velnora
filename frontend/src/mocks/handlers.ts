@@ -43,6 +43,7 @@ import {
   toListItem,
   toPublic,
 } from './engine'
+import { encodeWav } from '../lib/wav'
 import { MOCK_IMAGE_SVG, seedRecords, type MockRecord } from './fixtures'
 
 const PASSWORD = import.meta.env.VITE_MOCK_REVIEWER_PASSWORD || 'demo'
@@ -173,6 +174,7 @@ function createReport(input: {
   placeText: string | null
   point: { lat: number; lng: number } | null
   hasImage: boolean
+  voiceSeconds?: number | null
 }): MockRecord {
   const id = newId()
   const now = new Date().toISOString()
@@ -185,6 +187,10 @@ function createReport(input: {
     channel: input.channel,
     sender: input.from ? { masked: maskSender(input.from), same_sender_count: 0 } : null,
     call: null,
+    voice_note:
+      input.voiceSeconds != null
+        ? { audio_url: `/api/reports/${id}/audio`, duration_seconds: input.voiceSeconds }
+        : null,
     source_text: input.text,
     masked_text: maskText(input.text),
     has_image: input.hasImage,
@@ -287,6 +293,18 @@ export const handlers = [
       if (image.size > 5 * 1024 * 1024)
         return error(413, 'IMAGE_TOO_LARGE', 'Photo must be 5 MB or smaller.')
     }
+    // Optional voice note: 16 kHz mono WAV, like the backend's check_audio.
+    let voiceSeconds: number | null = null
+    const audio = form.get('audio')
+    if (audio instanceof File && audio.size > 0) {
+      const head = new DataView(await audio.slice(0, 44).arrayBuffer())
+      const riff = head.byteLength >= 44 && head.getUint32(0, false) === 0x52494646 // "RIFF"
+      if (!riff) return error(415, 'UNSUPPORTED_AUDIO', 'Send the recording as a WAV file.')
+      if (audio.size > 10 * 1024 * 1024)
+        return error(413, 'AUDIO_TOO_LARGE', 'Recordings must be 10 MB or smaller.')
+      const rate = head.getUint32(24, true)
+      voiceSeconds = rate ? head.getUint32(40, true) / (rate * 2) : null
+    }
     const lat = form.get('lat')
     const lng = form.get('lng')
     const rec = createReport({
@@ -296,6 +314,7 @@ export const handlers = [
       placeText: (form.get('place_text') as string) || null,
       point: lat && lng ? { lat: Number(lat), lng: Number(lng) } : null,
       hasImage: image instanceof File && image.size > 0,
+      voiceSeconds,
     })
     return HttpResponse.json(
       { id: rec.report.id, reference: rec.report.reference, status: 'pending_review' },
@@ -390,6 +409,18 @@ export const handlers = [
       const rec = record(String(params.id))
       if (!rec?.report.has_image) return error(404, 'NOT_FOUND', 'No image.')
       return new HttpResponse(MOCK_IMAGE_SVG, { headers: { 'Content-Type': 'image/svg+xml' } })
+    }),
+  ),
+
+  // Mock data can't keep real recordings across reloads, so voice notes play one second of silence.
+  http.get(
+    '/api/reports/:id/audio',
+    reviewerOnly(({ params }) => {
+      const rec = record(String(params.id))
+      if (!rec?.report.voice_note) return error(404, 'NOT_FOUND', 'This report has no recording.')
+      return new HttpResponse(encodeWav(new Float32Array(16000), 16000), {
+        headers: { 'Content-Type': 'audio/wav' },
+      })
     }),
   ),
 

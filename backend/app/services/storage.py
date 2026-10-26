@@ -11,6 +11,8 @@ from pathlib import Path
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
+from app.services.transcription import check_audio
+
 ALLOWED_FORMATS = {"JPEG": ("jpg", "image/jpeg"), "PNG": ("png", "image/png"), "WEBP": ("webp", "image/webp")}
 MEDIA_TYPES = {ext: mime for ext, mime in ALLOWED_FORMATS.values()}
 
@@ -51,3 +53,15 @@ def media_type(name: str) -> str:
 def delete_image(upload_dir: Path, name: str | None) -> None:
     if name:
         (upload_dir / name).unlink(missing_ok=True)
+
+
+def save_audio(data: bytes, upload_dir: Path, settings) -> tuple[str, float]:
+    """Validate a WAV recording (size, format, length) and store it privately.
+
+    Raises AudioRejected. Returns (file name, length in seconds).
+    """
+    seconds = check_audio(data, settings)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    name = f"{uuid.uuid4().hex}.wav"
+    (upload_dir / name).write_bytes(data)
+    return name, seconds
