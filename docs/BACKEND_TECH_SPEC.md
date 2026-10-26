@@ -113,7 +113,6 @@ data/
   README.md              # sources, licenses, synthetic-data note
   samples/reports.jsonl  # 30 synthetic labelled reports
   samples/duplicate_pairs.jsonl
-  fixtures/extractions/  # pre-generated, labelled fallback outputs
 ```
 
 ---
@@ -335,7 +334,7 @@ The backend also auto-geocodes the extracted `place_name` after extraction and s
 |---|---|---|
 | `GET /api/reports/{id}/duplicates` | — | `200 { "candidates": [DuplicateCandidate] }` (sorted by score, max 5) |
 | `POST /api/reports/{id}/merge` | `{ "target_id": "…", "note": "optional" }` | `200 Report` (this report becomes `merged`, `merged_into = target_id`) · `409 INVALID_MERGE_TARGET` |
-| `POST /api/reports/{id}/review` | `{ "action": "approve" \| "reject" \| "flag" \| "reopen", "urgency": "high" (optional), "note": "optional, ≤500" }` | `200 Report` · `409 LOCATION_REQUIRED` · `409 INVALID_TRANSITION` |
+| `POST /api/reports/{id}/review` | `{ "action": "approve" \| "reject" \| "flag" \| "reopen", "urgency": "high" (optional), "note": "optional, ≤500" }` — `action` may be omitted to change **urgency only** (e.g. from the action bar's urgency select); at least one of `action`/`urgency` is required | `200 Report` · `400 VALIDATION_ERROR` · `409 LOCATION_REQUIRED` · `409 INVALID_TRANSITION` |
 
 #### Public and dashboard
 | Method & path | Auth | Request | Response |
@@ -458,7 +457,7 @@ class LLMClient(Protocol):
     async def is_available(self) -> bool: ...
 ```
 - `OllamaClient`: `POST {OLLAMA_URL}/api/chat` with `{ model, messages, format, stream: false, options: { temperature: 0 } }`.
-- `FakeLLMClient`: returns fixtures from `data/fixtures/extractions/` keyed by a hash of the text; used in tests, CI, and `LLM_BACKEND=fake` for an offline demo (UI labels it "pre-generated").
+- `FakeLLMClient` (model name `fake-heuristic`): an offline keyword fallback that returns the same JSON shape, with exact phrases from the text as evidence; used in tests, CI, and `LLM_BACKEND=fake` for an offline demo (UI labels it "pre-generated"). It is not the product's AI.
 
 ---
 
@@ -472,7 +471,9 @@ Used for evidence matching and duplicate scoring; original text is never changed
 - Strip punctuation.
 
 ### 6.2 Duplicate scoring (`duplicates.py`)
-Compare a report only against reports **not** `rejected` or `merged`, created within `DUP_MAX_HOURS` (default 24).
+Compare a report only against reports **not** `rejected` or `merged`, created within `DUP_MAX_HOURS` (default 24). Suggestions are **computed when read** (no stored table), so they always reflect the latest corrections and locations.
+
+**Gates** (the pair is never suggested): both reports have a location and are more than `DUP_MAX_KM` apart; or both state needs and share none.
 
 | Signal | Score component | Weight |
 |---|---|---|
@@ -483,7 +484,7 @@ Compare a report only against reports **not** `rejected` or `merged`, created wi
 
 **Same sender bonus:** if both reports came from the same SMS/WhatsApp number (compared by `sender_hash`), add 0.15 (capped at 1.0) and the reason "Same sender".
 
-A candidate is suggested when `score ≥ DUP_MIN_SCORE` (default 0.55). Each candidate carries human-readable reasons. Optional P2: add EmbeddingGemma similarity for cross-script matching. All thresholds are environment variables and are tuned on the labelled pairs.
+A candidate is suggested when `score ≥ DUP_MIN_SCORE` (default 0.6). Each candidate carries human-readable reasons. Optional P2: add EmbeddingGemma similarity for cross-script matching. All thresholds are environment variables and are tuned on the labelled pairs.
 
 ---
 
@@ -519,10 +520,9 @@ A candidate is suggested when `score ≥ DUP_MIN_SCORE` (default 0.55). Each can
 
 | Table | Key columns |
 |---|---|
-| `reports` | `id` PK, `reference` (unique), `created_at`, `updated_at`, `is_synthetic`, `channel`, `sender_contact` (nullable), `sender_hash` (nullable, indexed), `provider_message_id` (unique, nullable — Twilio `MessageSid`), `source_text`, `masked_text`, `submitted_place_text`, `submitted_lat`, `submitted_lng`, `image_path`, `status`, `urgency`, `urgency_set_by_reviewer` (bool), `merged_into` FK, `reviewer_fields` (JSON) |
+| `reports` | `id` PK, `reference` (unique), `created_at`, `updated_at`, `is_synthetic`, `channel`, `sender_contact` (nullable), `sender_hash` (nullable, indexed), `provider_message_id` (unique, nullable — Twilio `MessageSid`), `source_text`, `masked_text`, `submitted_place_text`, `submitted_lat`, `submitted_lng`, `image_path`, `intake_notes` (JSON), `status`, `urgency`, `urgency_set_by_reviewer` (bool), `merged_into` FK, `reviewer_fields` (JSON) |
 | `extractions` | `report_id` PK/FK, `status`, `model`, `attempts`, `language`, `output` (JSON, validated + evidence offsets), `raw_response` (text, truncated), `error`, `completed_at` |
 | `locations` | `report_id` PK/FK, `suggested_lat`, `suggested_lng`, `suggested_label`, `confirmed_lat`, `confirmed_lng`, `confirmed_label`, `confirmed_source`, `confirmed_at` |
-| `duplicate_suggestions` | `report_id`, `candidate_id`, `score`, `reasons` (JSON), `computed_at` |
 | `audit_log` | `id`, `report_id`, `at`, `actor`, `action`, `from_status`, `to_status`, `details` (JSON), `note` |
 | `geocode_cache` | `query_norm` PK, `results` (JSON), `fetched_at` |
 
@@ -533,7 +533,7 @@ Create tables on startup (or with Alembic if time allows).
 ## 10. Configuration (`.env.example`)
 ```
 # Model
-LLM_BACKEND=ollama                # ollama | fake
+LLM_BACKEND=fake                  # fake (offline fallback) | ollama (Gemma 4)
 OLLAMA_URL=http://localhost:11434
 OLLAMA_MODEL=gemma4:e4b           # verify the exact tag with `ollama list`
 LLM_TIMEOUT_SECONDS=90
@@ -556,7 +556,7 @@ NOMINATIM_USER_AGENT=ReliefLens/0.1 (+https://github.com/alihaider-builds/Velnor
 # Duplicates
 DUP_MAX_KM=2
 DUP_MAX_HOURS=24
-DUP_MIN_SCORE=0.55
+DUP_MIN_SCORE=0.6
 
 # SMS / WhatsApp (real channels are optional; leave blank to use the simulator only)
 TWILIO_ACCOUNT_SID=

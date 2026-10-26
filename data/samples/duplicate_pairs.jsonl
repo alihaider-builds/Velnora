@@ -1,0 +1,16 @@
+{"a": "S01", "b": "S13", "duplicate": true}
+{"a": "S02", "b": "S14", "duplicate": true}
+{"a": "S03", "b": "S15", "duplicate": true}
+{"a": "S04", "b": "S16", "duplicate": true}
+{"a": "S05", "b": "S17", "duplicate": true}
+{"a": "S06", "b": "S18", "duplicate": true}
+{"a": "S07", "b": "S19", "duplicate": true}
+{"a": "S08", "b": "S20", "duplicate": true}
+{"a": "S01", "b": "S21", "duplicate": false}
+{"a": "S03", "b": "S22", "duplicate": false}
+{"a": "S04", "b": "S23", "duplicate": false}
+{"a": "S05", "b": "S24", "duplicate": false}
+{"a": "S10", "b": "S28", "duplicate": false}
+{"a": "S02", "b": "S08", "duplicate": false}
+{"a": "S06", "b": "S25", "duplicate": false}
+{"a": "S12", "b": "S22", "duplicate": false}
