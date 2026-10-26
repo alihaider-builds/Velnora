@@ -25,3 +25,6 @@ public/models/
 *.njsproj
 *.sln
 *.sw?
+
+# One-file demo build (npm run build:standalone)
+dist-standalone

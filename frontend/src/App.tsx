@@ -1,11 +1,14 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { Tooltip } from 'radix-ui'
-import { createBrowserRouter, RouterProvider } from 'react-router'
+import { createBrowserRouter, createHashRouter, RouterProvider } from 'react-router'
 import { queryClient } from './api/queryClient'
 import { ToastProvider } from './components/Toast'
 import { buildRoutes } from './routes'
 
-const router = createBrowserRouter(buildRoutes({ devTools: import.meta.env.DEV }))
+// A file opened from disk has no server to resolve /review etc., so the one-file demo uses #/ URLs.
+const createRouter =
+  import.meta.env.VITE_STANDALONE === 'true' ? createHashRouter : createBrowserRouter
+const router = createRouter(buildRoutes({ devTools: import.meta.env.DEV }))
 
 export default function App() {
   return (

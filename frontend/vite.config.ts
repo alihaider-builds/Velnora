@@ -25,8 +25,60 @@ function maplibreWorker(): Plugin {
   }
 }
 
+// `npm run build:standalone`: inline the single JS bundle and stylesheet into the HTML so the
+// whole app is one file (dist-standalone/relieflens-demo.html) that opens from disk.
+function singleFileHtml(): Plugin {
+  return {
+    name: 'relieflens-single-file',
+    enforce: 'post',
+    generateBundle(_options, bundle) {
+      const html = bundle['index.html']
+      if (!html || html.type !== 'asset') return
+      let page = String(html.source)
+      for (const [name, item] of Object.entries(bundle)) {
+        if (item.type === 'chunk' && item.isEntry) {
+          const code = item.code.replace(/<\/script/gi, '<\\/script')
+          page = page.replace(
+            new RegExp(
+              `<script[^>]*src="[^"]*${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*></script>`,
+            ),
+            () => `<script type="module">${code}</script>`,
+          )
+        } else if (item.type === 'asset' && name.endsWith('.css')) {
+          page = page.replace(
+            new RegExp(
+              `<link[^>]*href="[^"]*${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*>`,
+            ),
+            () => `<style>${String(item.source)}</style>`,
+          )
+        }
+      }
+      const favicon = readFileSync('public/favicon.svg').toString('base64')
+      page = page.replace(/href="[^"]*favicon\.svg"/, `href="data:image/svg+xml;base64,${favicon}"`)
+      for (const name of Object.keys(bundle)) delete bundle[name]
+      this.emitFile({ type: 'asset', fileName: 'relieflens-demo.html', source: page })
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
+  if (mode === 'standalone') {
+    return {
+      base: './',
+      publicDir: false, // the one file needs nothing from public/ (offline voice models stay out)
+      plugins: [react(), tailwindcss(), singleFileHtml()],
+      build: {
+        outDir: 'dist-standalone',
+        emptyOutDir: true,
+        assetsInlineLimit: Number.MAX_SAFE_INTEGER,
+        cssCodeSplit: false,
+        chunkSizeWarningLimit: 10_000,
+        rolldownOptions: { output: { inlineDynamicImports: true } },
+      },
+    }
+  }
+
   const env = loadEnv(mode, process.cwd(), 'VITE_')
 
   // All API calls use relative /api/... paths (UI_UX_SPEC §2). Both the dev server and

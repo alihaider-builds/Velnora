@@ -9,6 +9,8 @@ interface ImportMetaEnv {
   readonly VITE_MOCK_REVIEWER_PASSWORD?: string
   /** Mock mode only: "false" simulates a backend with demo mode off. */
   readonly VITE_MOCK_DEMO_MODE?: string
+  /** "true" builds the one-file offline demo (npm run build:standalone). */
+  readonly VITE_STANDALONE?: string
 }
 
 interface ImportMeta {
