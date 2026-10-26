@@ -184,6 +184,7 @@ def test_twilio_voice_flow(tmp_path):
     ("hum lalkurti cantt rawalpindi mein hain, pani bhar gaya", "lalkurti cantt rawalpindi"),
     ("Lalkurti, Cantt, Rawalpindi mein 3 ghar gir gaye", "Lalkurti, Cantt, Rawalpindi"),
     ("Pir Baba ke qareeb 12 log phanse hain", "Pir Baba"),
+    ("Assalam o alaikum, Lalkurti Cantt Rawalpindi mein pani aa gaya", "Lalkurti Cantt Rawalpindi"),
     ("Flood water entered our street in Rajanpur. We need water", "Rajanpur"),
     ("D.I. Khan mein flood ki wajah se", "D.I. Khan"),
     ("Sector G-9 Islamabad mein basement mein pani", "Sector G-9 Islamabad"),

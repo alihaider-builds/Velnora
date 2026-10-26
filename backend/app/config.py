@@ -56,6 +56,12 @@ class Settings(BaseSettings):
     twilio_auth_token: str = ""
     twilio_validate_signature: bool = True
     public_base_url: str = ""
+    # SMS to your own SIM via "SMS Gateway for Android" (sms-gate.app) on the helpline phone
+    sms_gateway_signing_key: str = ""  # app: Settings > Webhooks > Signing Key
+    sms_gateway_reply: bool = False  # send the reference back by SMS from the helpline phone
+    sms_gateway_api_url: str = "https://api.sms-gate.app/3rdparty/v1"
+    sms_gateway_username: str = ""
+    sms_gateway_password: str = ""
     sender_hash_secret: str = ""
     helpline_emergency_number: str = "1122"
 

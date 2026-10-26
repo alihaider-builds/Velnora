@@ -46,6 +46,18 @@ The model sits behind one interface (`app/services/llm/`), so it can be swapped 
 - **Demo:** `POST /api/simulator/send` (demo mode only) goes through exactly the same code as real messages.
 - **Real channels (optional):** set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and `PUBLIC_BASE_URL` (a tunnel such as `cloudflared tunnel --url http://localhost:8000`), then point Twilio's incoming-message webhooks at `/api/inbound/sms` and `/api/inbound/whatsapp`. Every request's Twilio signature is verified. See spec §16.4.
 
+### SMS to your own helpline SIM (Android SMS gateway, free)
+An ordinary SIM can't send texts to a server by itself, so an Android phone holding the helpline SIM runs the open-source
+[SMS Gateway for Android](https://sms-gate.app) app, which forwards every received SMS to `/api/inbound/sms-gateway`.
+1. Install the app on the phone with the helpline SIM, allow SMS access, and turn on **Cloud Server** (it shows a username and password).
+2. Expose the backend over HTTPS: `cloudflared tunnel --url http://localhost:8000` (the gateway needs a valid certificate).
+3. In the app, **Settings → Webhooks → Signing Key**: set it to the `SMS_GATEWAY_SIGNING_KEY` value from `.env` (or copy the app's key into `.env`). Restart the backend.
+4. Register the webhook (username/password from step 1):
+   `curl -u USER:PASS --json '{"url":"https://<tunnel>/api/inbound/sms-gateway","event":"sms:received"}' https://api.sms-gate.app/3rdparty/v1/webhooks`
+5. Optional reply with the reference number: `SMS_GATEWAY_REPLY=true`, `SMS_GATEWAY_USERNAME`, `SMS_GATEWAY_PASSWORD` in `.env` (sent from the helpline SIM at normal SMS rates).
+
+Each forwarded SMS is checked (HMAC-SHA256 signature, timestamp within 5 minutes), stored as an `sms` report and extracted; gateway retries never create duplicates.
+
 ## Helpline calls and transcription
 
 - **Real calls (optional):** point a Twilio number's voice webhook at `/api/inbound/voice`. Callers hear a recording notice, leave a message after the beep, and the recording arrives at `/api/inbound/voice/recording`.
@@ -68,7 +80,7 @@ Six built-ins are created automatically. The organizer adds more from the dashbo
 ## Tests, lint and evaluation
 
 ```bash
-pytest                       # 91 tests; no GPU, model or network needed
+pytest                       # 97 tests; no GPU, model or network needed
 ruff check app tests ../eval
 python ../eval/run_eval.py   # writes eval/results.md  (add --geocode to test map search)
 ```

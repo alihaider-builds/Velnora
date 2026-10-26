@@ -2,7 +2,7 @@
 
 - Model backend: `fake` (`fake-heuristic`)
 - Test set: 30 synthetic labelled reports, 16 labelled duplicate pairs (`data/samples/`)
-- Generated: 2026-10-26 06:04 UTC
+- Generated: 2026-10-26 10:50 UTC
 
 | Metric | Result |
 |---|---|

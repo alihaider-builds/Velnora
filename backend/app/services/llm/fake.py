@@ -60,6 +60,9 @@ PLACE_STOPWORDS = {
     "aur", "ka", "ki", "ke", "ab", "abhi", "bhi", "to", "toh", "please", "plz", "help", "madad", "hai", "hain",
     "tha", "the", "se", "ko", "is", "us", "iss", "uss", "aaj", "kal", "raat", "subah", "bohat", "bahut",
     "flood", "sailab", "barish", "we", "our", "i", "my", "are", "a", "an", "of",
+    # greetings that open many SMS ("Assalam o alaikum, ...")
+    "assalam", "asalam", "assalamu", "salam", "salaam", "alaikum", "alaykum", "alekum", "walaikum", "aoa", "o",
+    "hello", "hi", "sir", "janab", "bhai", "السلام", "علیکم",
     "ہم", "ہمارے", "ہمارا", "ہماری", "میرے", "میرا", "یہاں", "گاؤں", "گھر", "گلی", "سب", "لوگ", "اور", "کے", "کا", "کی",
 }
 _LOCATIVE_AFTER = {"mein", "me", "main", "mai", "men", "wale", "walay", "wali", "میں", "والے"}
