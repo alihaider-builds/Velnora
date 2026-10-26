@@ -180,7 +180,22 @@ cd backend && python ../eval/run_eval.py     # writes eval/results.md (model fro
 **Demo video:** _link to be added_
 
 **Screenshots:** see [`docs/screenshots/`](docs/screenshots/) (map, submit form, review queue, report with evidence, dashboard).
+<img width="957" height="446" alt="Screenshot 2026-10-26 215705" src="https://github.com/user-attachments/assets/fc0373df-4a72-4027-9450-cf6892e66cc3" />
+<img width="941" height="444" alt="Screenshot 2026-10-26 215538" src="https://github.com/user-attachments/assets/61831205-dd9a-472f-b0e8-ad165dc4703f" />
+<img width="945" height="440" alt="Screenshot 2026-10-26 215643" src="https://github.com/user-attachments/assets/28216b7e-3bb0-468d-b8fc-4274c7ceae7b" />
+<img width="950" height="443" alt="Screenshot 2026-10-26 215724" src="https://github.com/user-attachments/assets/0007cb74-08a7-42dc-adb4-1ef655b2a42f" />
+<img width="959" height="447" alt="Screenshot 2026-10-26 215739" src="https://github.com/user-attachments/assets/e649c2a9-f9d0-4936-9741-364ce644f2ca" />
 
+## How It Works
+
+1. **Report Submission:** Users submit disaster or emergency reports through the application.
+2. **Incident Processing:** The backend processes incoming reports and assigns relevant categories using its current heuristic-based logic.
+3. **Duplicate Detection:** The system checks for potentially duplicate incidents to reduce repeated reports.
+4. **Location Mapping:** Incident location information can be used to display reports geographically on a map.
+5. **Review and Management:** Relief teams can review and organize incident information to support disaster response decisions.
+6. **Data Storage:** The backend connects to Supabase PostgreSQL for persistent data storage.
+
+The React frontend communicates with the FastAPI backend through API endpoints. Currently, incident processing uses a heuristic model rather than a live AI model.
 
 ## Privacy, safety and responsible AI
 
@@ -207,7 +222,7 @@ Team **The Baghools** — two members, one laptop each, working against a shared
 
 | Member | Contributions |
 |---|---|
-| **Ali Haider** ([@alihaider-builds](https://github.com/alihaider-builds)) — frontend | Repository and licence; the React app and its core screens (public map, submit, simulator, review queue, report screen with evidence highlighting, location picker, duplicates and merge, dashboard, sign-in); design tokens and layout; mock backend; voice typing with offline Whisper and web voice notes (frontend and backend); frontend tests. About 8,800 lines, mostly `frontend/`. |
+| **Ali Haider** ([@alihaider-builds](https://github.com/alihaider-builds)) — frontend | Repository and licence; the React app and its core screens (public map, submit, simulator, review queue, report screen with evidence highlighting, location picker, duplicates and merge, dashboard, sign-in); design tokens and layout; mock backend; voice typing with offline Whisper and web voice notes (frontend and backend); frontend tests. About 8,800 lines,  `frontend/`, 'Supabase Database/', 'error fixing/'. |
 | **KibroPixen(Haris Jahangir)** ([@KibroPixen](https://github.com/KibroPixen)) — backend & AI | Product brief, PRD and specs; the FastAPI backend (extraction with evidence grounding, duplicates, geocoding, review workflow, privacy filter, exports); SMS/WhatsApp/Twilio, textbee and SMS-gateway intake; helpline calls; help categories and helplines; evaluation; and frontend features on top of the app (call panel and simulator, category/helpline/SMS panels, place type-ahead, coordinates input, downloads, microphone and blank-map fixes, UI clean-up, responsive fixes). About 6,400 lines of backend and 2,800 of docs. |
 
 Line counts are additions on `main` from `git log --numstat`; the commit history shows each member's work.
