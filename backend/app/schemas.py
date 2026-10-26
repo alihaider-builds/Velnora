@@ -98,7 +98,13 @@ class Sender(BaseModel):
     same_sender_count: int
 
 
+class CallHelpline(BaseModel):
+    number: str
+    label: str | None
+
+
 class CallInfo(BaseModel):
+    helpline: CallHelpline | None = None
     duration_seconds: float | None
     has_audio: bool
     audio_url: str | None
@@ -323,3 +329,52 @@ class CategoryPatch(BaseModel):
     label_ur: str | None = Field(default=None, max_length=40)
     keywords: list[str] | None = Field(default=None, max_length=20)
     active: bool | None = None
+
+
+class Helpline(BaseModel):
+    id: str
+    number: str
+    label: str
+    provider_number: str | None
+    active: bool
+    created_at: str
+
+
+class HelplineList(BaseModel):
+    items: list[Helpline]
+
+
+class PublicHelpline(BaseModel):
+    number: str
+    label: str
+
+
+class PublicHelplineList(BaseModel):
+    items: list[PublicHelpline]
+
+
+_PHONE_PATTERN = r"^[+0-9][0-9 ()-]{6,24}$"
+
+
+class HelplineCreate(BaseModel):
+    number: str = Field(pattern=_PHONE_PATTERN)
+    label: str = Field(min_length=2, max_length=60)
+    provider_number: str | None = Field(default=None, pattern=_PHONE_PATTERN)
+
+
+class HelplinePatch(BaseModel):
+    label: str | None = Field(default=None, min_length=2, max_length=60)
+    provider_number: str | None = Field(default=None, pattern=_PHONE_PATTERN)
+    active: bool | None = None
+
+
+class PlaceSuggestion(BaseModel):
+    label: str
+    name: str
+    lat: float | None
+    lng: float | None
+
+
+class PlaceSuggestResponse(BaseModel):
+    provider: str
+    items: list[PlaceSuggestion]

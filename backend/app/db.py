@@ -44,6 +44,8 @@ reports = Table(
     Column("transcript_status", String),  # None for non-call reports; pending|running|succeeded|failed|manual
     Column("transcript_model", String),
     Column("transcript_error", Text),
+    Column("helpline_number", String),  # which helpline the call came in on (snapshot at call time)
+    Column("helpline_label", String),
     Column("intake_notes", JSON, nullable=False, default=list),
     Column("status", String, nullable=False),
     Column("urgency", String, nullable=False),
@@ -104,6 +106,17 @@ categories = Table(
     Column("builtin", Boolean, nullable=False, default=False),
     Column("active", Boolean, nullable=False, default=True),
     Column("position", Integer, nullable=False, default=0),
+    Column("created_at", String, nullable=False),
+)
+
+helplines = Table(
+    "helplines",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("number", String, unique=True, nullable=False),  # the number people dial, +92...
+    Column("label", String, nullable=False),
+    Column("provider_number", String),  # the telephony (Twilio) number calls are forwarded to, if different
+    Column("active", Boolean, nullable=False, default=True),
     Column("created_at", String, nullable=False),
 )
 

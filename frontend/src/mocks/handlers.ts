@@ -15,6 +15,10 @@ import type {
   Category,
   CategoryCreateRequest,
   CategoryPatchRequest,
+  Helpline,
+  HelplineCreateRequest,
+  HelplinePatchRequest,
+  PlaceSuggestion,
   ConfirmLocationRequest,
   MergeRequest,
   NeedCategory,
@@ -624,7 +628,79 @@ function categoryKey(label: string): string {
   return key
 }
 
+// Helplines (organizer-managed) and place suggestions.
+const helplines: Helpline[] = []
+
+function normPhone(raw: string): string {
+  let d = raw.replace(/\D/g, '')
+  if (d.startsWith('0092')) d = d.slice(2)
+  else if (d.startsWith('0') && d.length === 11) d = `92${d.slice(1)}`
+  return d ? `+${d}` : ''
+}
+
+const MOCK_PLACES: PlaceSuggestion[] = [
+  { name: 'Lalkurti', label: 'Lalkurti, Rawalpindi, Punjab', lat: 33.581, lng: 73.056 },
+  { name: 'Saddar', label: 'Saddar, Rawalpindi, Punjab', lat: 33.596, lng: 73.051 },
+  { name: 'Rawalpindi', label: 'Rawalpindi, Punjab', lat: 33.6, lng: 73.05 },
+  { name: 'Rajanpur', label: 'Rajanpur, Punjab', lat: 29.104, lng: 70.33 },
+  { name: 'Buner', label: 'Buner, Khyber Pakhtunkhwa', lat: 34.5, lng: 72.48 },
+  { name: 'Charsadda', label: 'Charsadda, Khyber Pakhtunkhwa', lat: 34.15, lng: 71.74 },
+  { name: 'Jacobabad', label: 'Jacobabad, Sindh', lat: 28.28, lng: 68.44 },
+]
+
 export const categoryHandlers = [
+  http.get('/api/places/suggest', async ({ request }) => {
+    await delay(150)
+    const q = (new URL(request.url).searchParams.get('q') ?? '').trim().toLowerCase()
+    if (q.length < 3) return error(400, 'VALIDATION_ERROR', 'Type at least 3 characters.')
+    const items = MOCK_PLACES.filter((p) =>
+      q.split(/\s+/).every((w) => p.label.toLowerCase().includes(w)),
+    )
+    return HttpResponse.json({ provider: 'osm', items })
+  }),
+  http.get('/api/helplines', () =>
+    HttpResponse.json({
+      items: helplines.filter((h) => h.active).map((h) => ({ number: h.number, label: h.label })),
+    }),
+  ),
+  http.get(
+    '/api/helplines/all',
+    reviewerOnly(() => HttpResponse.json({ items: helplines })),
+  ),
+  http.post(
+    '/api/helplines',
+    reviewerOnly(async ({ request }) => {
+      const body = (await request.json()) as HelplineCreateRequest
+      const number = normPhone(body.number)
+      if (number.length < 8) return error(400, 'VALIDATION_ERROR', 'Enter a phone number.')
+      if (helplines.some((h) => h.number === number))
+        return error(409, 'HELPLINE_EXISTS', 'This helpline number is already added.')
+      const h: Helpline = {
+        id: crypto.randomUUID(),
+        number,
+        label: body.label.trim(),
+        provider_number: body.provider_number ? normPhone(body.provider_number) : null,
+        active: true,
+        created_at: new Date().toISOString(),
+      }
+      helplines.push(h)
+      return HttpResponse.json(h, { status: 201 })
+    }),
+  ),
+  http.patch(
+    '/api/helplines/:id',
+    reviewerOnly(async ({ params, request }) => {
+      const h = helplines.find((x) => x.id === params.id)
+      if (!h) return error(404, 'NOT_FOUND', 'Helpline not found.')
+      const body = (await request.json()) as HelplinePatchRequest
+      if (body.label) h.label = body.label.trim()
+      if (body.provider_number !== undefined)
+        h.provider_number = body.provider_number ? normPhone(body.provider_number) : null
+      if (body.active !== undefined) h.active = body.active
+      return HttpResponse.json(h)
+    }),
+  ),
+
   http.get('/api/categories', ({ request }) => {
     const all = new URL(request.url).searchParams.get('include_inactive') === 'true'
     return HttpResponse.json({ items: categories.filter((c) => all || c.active) })
@@ -681,7 +757,12 @@ export const categoryHandlers = [
       hasImage: false,
     })
     const r = rec.report
+    const to = normPhone(String(form.get('to') ?? ''))
+    const line = helplines.find((h) => h.number === to || h.provider_number === to)
+    if (to && !line)
+      return error(400, 'VALIDATION_ERROR', 'That number is not a registered helpline.')
     r.call = {
+      helpline: line ? { number: line.number, label: line.label } : null,
       duration_seconds: 12,
       has_audio: false,
       audio_url: null,

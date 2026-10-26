@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     geocoder_enabled: bool = True
     google_maps_api_key: str = ""
     nominatim_url: str = "https://nominatim.openstreetmap.org"
+    photon_url: str = "https://photon.komoot.io"  # type-ahead place suggestions without a Google key
     nominatim_user_agent: str = "ReliefLens/0.1 (+https://github.com/alihaider-builds/Velnora)"
 
     # Duplicates

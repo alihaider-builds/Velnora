@@ -65,6 +65,7 @@ def create_report(
     extra_notes: list[str] | None = None,
     audio_name: str | None = None,
     call_seconds: float | None = None,
+    helpline: dict | None = None,
 ) -> Created:
     """Store a new report (extraction pending). Idempotent on `provider_message_id`."""
     notes = list(extra_notes or [])
@@ -104,6 +105,8 @@ def create_report(
                 image_path=image_name,
                 audio_path=audio_name,
                 call_duration_seconds=call_seconds,
+                helpline_number=helpline["number"] if helpline else None,
+                helpline_label=helpline["label"] if helpline else None,
                 transcript_status="pending" if channel == "call" else None,
                 intake_notes=notes,
                 status="pending_review",

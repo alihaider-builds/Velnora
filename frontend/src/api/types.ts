@@ -114,7 +114,14 @@ export interface Sender {
 }
 
 /** Present only on call reports. */
+export interface CallHelpline {
+  number: string
+  label: string | null
+}
+
 export interface CallInfo {
+  /** Which helpline the call came in on; null when it didn't match a registered one. */
+  helpline: CallHelpline | null
   duration_seconds: number | null
   has_audio: boolean
   audio_url: string | null
@@ -325,4 +332,51 @@ export interface CategoryPatchRequest {
 
 export interface TranscriptRequest {
   text: string
+}
+
+export interface Helpline {
+  id: string
+  number: string
+  label: string
+  provider_number: string | null
+  active: boolean
+  created_at: string
+}
+
+export interface HelplineListResponse {
+  items: Helpline[]
+}
+
+export interface PublicHelpline {
+  number: string
+  label: string
+}
+
+export interface PublicHelplineListResponse {
+  items: PublicHelpline[]
+}
+
+export interface HelplineCreateRequest {
+  number: string
+  label: string
+  provider_number?: string
+}
+
+export interface HelplinePatchRequest {
+  label?: string
+  provider_number?: string | null
+  active?: boolean
+}
+
+export interface PlaceSuggestion {
+  label: string
+  name: string
+  /** Google suggestions have no coordinates; OpenStreetMap ones do. */
+  lat: number | null
+  lng: number | null
+}
+
+export interface PlaceSuggestResponse {
+  provider: 'google' | 'osm'
+  items: PlaceSuggestion[]
 }

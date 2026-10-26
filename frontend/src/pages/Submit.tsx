@@ -1,14 +1,15 @@
-import { Camera, Lock, MapPin, Send, Trash2 } from 'lucide-react'
+import { Camera, Lock, MapPin, Phone, Send, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { ApiError } from '../api/client'
-import { useDemoMode, useSubmitReport } from '../api/hooks'
+import { useDemoMode, useHelplines, useSubmitReport } from '../api/hooks'
 import { CoordinateInput } from '../components/CoordinateInput'
 import { Dialog } from '../components/Dialog'
 import { MapView, type MapMarker } from '../components/MapView'
+import { PlaceAutocomplete } from '../components/PlaceAutocomplete'
 import { Callout, Spinner } from '../components/ui'
 import { PAKISTAN_BOUNDS } from '../lib/config'
-import { formatCoords } from '../lib/format'
+import { formatCoords, formatPhone } from '../lib/format'
 import { codePoints } from '../lib/text'
 
 const MIN = 10
@@ -96,6 +97,7 @@ export function Submit() {
   const navigate = useNavigate()
   const demoMode = useDemoMode()
   const submit = useSubmitReport()
+  const helplines = useHelplines().data?.items ?? []
 
   const [text, setText] = useState('')
   const [place, setPlace] = useState('')
@@ -203,6 +205,18 @@ export function Submit() {
         checks every report before anything appears on the public map.
       </p>
 
+      {helplines.length > 0 && (
+        <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+          <Phone size={16} aria-hidden="true" className="text-primary" />
+          <span className="font-medium">Prefer to talk? Call the helpline:</span>
+          {helplines.map((h) => (
+            <a key={h.number} href={`tel:${h.number}`} dir="ltr" className="link font-mono">
+              {formatPhone(h.number)}
+            </a>
+          ))}
+        </p>
+      )}
+
       <form onSubmit={onSubmit} noValidate className="card mt-6 flex flex-col gap-6 p-5 sm:p-6">
         <div>
           <label htmlFor="report-text" className="label">
@@ -234,21 +248,22 @@ export function Submit() {
           <label htmlFor="report-place" className="label">
             Where? <span className="font-normal text-muted">(optional)</span>
           </label>
-          <input
+          <PlaceAutocomplete
             id="report-place"
-            dir="auto"
-            className="input"
             value={place}
-            maxLength={200}
-            onChange={(e) => setPlace(e.target.value)}
-            aria-describedby="report-place-help"
-            aria-invalid={errors.place ? true : undefined}
+            onChange={setPlace}
+            onSelect={(sug) => {
+              setPlace(sug.label)
+              if (sug.lat !== null && sug.lng !== null) setPoint({ lat: sug.lat, lng: sug.lng })
+            }}
+            describedBy="report-place-help"
+            invalid={!!errors.place}
           />
           <p
             id="report-place-help"
             className={`mt-1 text-sm ${errors.place ? 'text-rejected' : 'text-muted'}`}
           >
-            {errors.place ?? 'Village, area or landmark'}
+            {errors.place ?? 'Village, area or landmark — pick a suggestion to place a pin'}
           </p>
 
           <div className="mt-3 flex flex-wrap items-center gap-3">

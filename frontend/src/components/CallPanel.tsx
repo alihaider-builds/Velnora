@@ -4,6 +4,7 @@ import { usePutTranscript } from '../api/hooks'
 import type { Report } from '../api/types'
 import { useToast } from './Toast'
 import { errorMessage } from './ui'
+import { formatPhone } from '../lib/format'
 
 function duration(seconds: number | null): string {
   if (seconds === null) return ''
@@ -54,6 +55,11 @@ export function CallPanel({ report }: { report: Report }) {
         {call.duration_seconds !== null && (
           <span className="font-normal text-muted">· {duration(call.duration_seconds)}</span>
         )}
+      </p>
+      <p className="text-xs text-muted">
+        {call.helpline
+          ? `Called ${call.helpline.label ?? 'helpline'} · ${formatPhone(call.helpline.number)}`
+          : 'Called an unregistered number'}
       </p>
       {call.has_audio && call.audio_url && (
         <audio controls preload="metadata" src={call.audio_url} className="w-full">

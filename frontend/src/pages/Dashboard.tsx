@@ -5,6 +5,7 @@ import type { Channel, ReportStatus, Urgency } from '../api/types'
 import { BarList } from '../components/BarList'
 import { NeedChip } from '../components/badges'
 import { CategoryManager } from '../components/CategoryManager'
+import { HelplineManager } from '../components/HelplineManager'
 import { ErrorState, Skeleton } from '../components/ui'
 import { CHANNEL_ORDER, CHANNELS, STATUS, URGENCY_LABEL } from '../lib/meta'
 
@@ -202,6 +203,7 @@ export function Dashboard() {
         </section>
       </div>
 
+      <HelplineManager />
       <CategoryManager />
 
       <section aria-labelledby="areas-h" className="card overflow-hidden">

@@ -214,6 +214,7 @@ When `status` is `pending`, `running` or `failed`, all content fields are empty 
 **CallInfo** (call reports only; `null` otherwise — see §16.5)
 ```json
 {
+  "helpline": { "number": "+923001234567", "label": "Main helpline" },
   "duration_seconds": 42.5,
   "has_audio": true,
   "audio_url": "/api/reports/3f9a…/audio",
@@ -326,7 +327,7 @@ The simulator calls the **same internal function** as the webhooks; only the sig
 | `POST /api/inbound/voice` | Twilio signature | Twilio voice webhook (`CallSid`, `From`, …) | TwiML: recording notice (`<Say>`) + `<Record>` with `recordingStatusCallback` |
 | `POST /api/inbound/voice/done` | Twilio signature | — | TwiML goodbye + `<Hangup/>` |
 | `POST /api/inbound/voice/recording` | Twilio signature | `RecordingSid`, `RecordingUrl`, `RecordingStatus`, `CallSid` | `204` — downloads the WAV, creates a `call` report, transcribes; repeated `RecordingSid` ignored |
-| `POST /api/simulator/call` | none, **demo mode only** | multipart: `from`, `audio` (WAV, ≤10 MB, ≤5 min), optional `transcript_hint` (typed stand-in when no speech model is installed) | `200 { "report_id", "reference", "reply" }` · `413 AUDIO_TOO_LARGE`/`AUDIO_TOO_LONG` · `415 UNSUPPORTED_AUDIO` |
+| `POST /api/simulator/call` | none, **demo mode only** | multipart: `from`, `audio` (WAV, ≤10 MB, ≤5 min), optional `to` (the helpline dialled), optional `transcript_hint` (typed stand-in when no speech model is installed) | `200 { "report_id", "reference", "reply" }` · `400` (`to` is not a helpline) · `413 AUDIO_TOO_LARGE`/`AUDIO_TOO_LONG` · `415 UNSUPPORTED_AUDIO` |
 
 #### Reviewer: reports
 | Method & path | Request | Response |
@@ -369,6 +370,11 @@ The backend also auto-geocodes the extracted `place_name` after extraction and s
 | `GET /api/categories` | none (`include_inactive=true` needs reviewer) | — | `200 { "items": [Category] }` (active only by default, display order) |
 | `POST /api/categories` | reviewer | `{ "label": "Blankets", "label_ur": "کمبل", "keywords": ["kambal", "razai"] }` (label 2–40; ≤20 keywords) | `201 Category` · `409 CATEGORY_EXISTS` |
 | `PATCH /api/categories/{key}` | reviewer | any of `label`, `label_ur`, `keywords`, `active` | `200 Category` · `404` · `409 CATEGORY_LOCKED` (`other` can't be turned off) |
+| `GET /api/helplines` | none | — | `200 { "items": [{ "number", "label" }] }` (active only) |
+| `GET /api/helplines/all` | reviewer | — | `200 { "items": [Helpline] }` — `{ id, number, label, provider_number, active, created_at }` |
+| `POST /api/helplines` | reviewer | `{ "number": "0300 1234567", "label": "Main helpline", "provider_number": "+15550100199" }` (numbers normalised to `+92…`; `provider_number` optional) | `201 Helpline` · `409 HELPLINE_EXISTS` |
+| `PATCH /api/helplines/{id}` | reviewer | any of `label`, `provider_number`, `active` | `200 Helpline` · `404` |
+| `GET /api/places/suggest?q=` | none (60/min per IP) | `q` 3–120 chars | `200 { "provider": "google"\|"osm", "items": [{ "label", "name", "lat", "lng" }] }` (Google items have `lat`/`lng` `null`) · `502 GEOCODER_UNAVAILABLE` |
 
 New categories are used by the AI for reports extracted from then on; turned-off ones stop being suggested. Reviewer corrections may use any existing key.
 
@@ -758,6 +764,7 @@ The queue is ordered by time only (newest first, or oldest first on request). Th
 3. **Transcription:** with `TRANSCRIBER_BACKEND=gemma`, Gemma 4 (E2B/E4B) transcribes through Hugging Face Transformers' `any-to-any` pipeline. Gemma audio accepts at most **30 s per clip at 16 kHz mono**, so recordings are resampled and split into 30-second chunks and the texts joined ([Gemma audio guide](https://ai.google.dev/gemma/docs/capabilities/audio)). Install with `pip install -e ".[audio]"` (large download). Ollama does not currently expose Gemma audio.
 4. Without a speech model the transcript is marked `failed` and the reviewer listens and types it (`PUT /api/reports/{id}/transcript`); a reviewer can also correct an automatic transcript. Either way extraction then runs on the text.
 5. The audio is reviewer-only (`GET …/audio`), never public, and is deleted with the report.
+6. **Helpline numbers** (`/api/helplines`, managed on the dashboard). A call reaches the backend only through a telephony provider, so an ordinary mobile number becomes a helpline by forwarding its calls to the Twilio number (`provider_number`). The voice webhook matches Twilio's `To`, `ForwardedFrom` or `CalledVia` against `number`/`provider_number` and stores the helpline on the report (`call.helpline`). Calls to an unknown number are still recorded, with `helpline: null`.
 
 ## 18. Help categories
 

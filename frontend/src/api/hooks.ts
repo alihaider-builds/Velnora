@@ -12,9 +12,15 @@ import type {
   DuplicatesResponse,
   GeocodeResponse,
   HealthResponse,
+  Helpline,
+  HelplineCreateRequest,
+  HelplineListResponse,
+  HelplinePatchRequest,
   MergeRequest,
   NeedCategory,
   OriginalResponse,
+  PlaceSuggestResponse,
+  PublicHelplineListResponse,
   PublicReportsResponse,
   PublicStats,
   Report,
@@ -40,6 +46,9 @@ export const keys = {
   publicStats: ['public', 'stats'] as const,
   stats: ['stats'] as const,
   categories: (includeInactive: boolean) => ['categories', includeInactive] as const,
+  helplines: ['helplines', 'public'] as const,
+  helplinesAll: ['helplines', 'all'] as const,
+  placeSuggest: (q: string) => ['places', 'suggest', q] as const,
 }
 
 const isExtracting = (s: string | null | undefined) => s === 'pending' || s === 'running'
@@ -296,4 +305,53 @@ export function usePatchCategory() {
   return useCategoryMutation(({ key, ...body }: CategoryPatchRequest & { key: string }) =>
     api.patch<Category>(`/api/categories/${key}`, body),
   )
+}
+
+// ---- Helplines & place suggestions --------------------------------------------------------
+
+export function useHelplines() {
+  return useQuery({
+    queryKey: keys.helplines,
+    queryFn: () => api.get<PublicHelplineListResponse>('/api/helplines'),
+    staleTime: 60_000,
+  })
+}
+
+export function useAllHelplines() {
+  return useQuery({
+    queryKey: keys.helplinesAll,
+    queryFn: () => api.get<HelplineListResponse>('/api/helplines/all'),
+  })
+}
+
+function useHelplineMutation<V>(fn: (vars: V) => Promise<Helpline>) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['helplines'] }),
+  })
+}
+
+export function useCreateHelpline() {
+  return useHelplineMutation((body: HelplineCreateRequest) =>
+    api.post<Helpline>('/api/helplines', body),
+  )
+}
+
+export function usePatchHelpline() {
+  return useHelplineMutation(({ id, ...body }: HelplinePatchRequest & { id: string }) =>
+    api.patch<Helpline>(`/api/helplines/${id}`, body),
+  )
+}
+
+/** Type-ahead place suggestions; pass the debounced text. */
+export function usePlaceSuggestions(q: string) {
+  const query = q.trim()
+  return useQuery({
+    queryKey: keys.placeSuggest(query.toLowerCase()),
+    queryFn: () => api.get<PlaceSuggestResponse>('/api/places/suggest', { q: query }),
+    enabled: query.length >= 3,
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
 }

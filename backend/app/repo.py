@@ -127,6 +127,7 @@ def call_obj(b: Bundle) -> dict | None:
     if r["channel"] != "call":
         return None
     return {
+        "helpline": {"number": r["helpline_number"], "label": r["helpline_label"]} if r["helpline_number"] else None,
         "duration_seconds": r["call_duration_seconds"],
         "has_audio": bool(r["audio_path"]),
         "audio_url": f"/api/reports/{r['id']}/audio" if r["audio_path"] else None,

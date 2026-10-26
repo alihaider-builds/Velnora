@@ -19,6 +19,7 @@ from app.errors import APIError
 from app.ratelimit import RateLimiter
 from app.routers.deps import schedule_call, schedule_extraction
 from app.schemas import SimulatorRequest, SimulatorResponse
+from app.services import helplines
 from app.services.channels import call_reply_text, create_report, reply_text
 from app.services.storage import ImageRejected, save_image
 from app.services.transcription import AudioRejected, check_audio
@@ -154,8 +155,10 @@ async def inbound_voice(request: Request):
     settings = request.app.state.settings
     params = {k: str(v) for k, v in (await request.form()).items()}
     _verify(request, params, settings)
-    if params.get("CallSid") and params.get("From"):
-        request.app.state.pending_calls[params["CallSid"]] = params["From"]
+    if params.get("CallSid"):
+        with request.app.state.engine.connect() as conn:
+            helpline = helplines.match(conn, params.get("To"), params.get("ForwardedFrom"), params.get("CalledVia"))
+        request.app.state.pending_calls[params["CallSid"]] = {"from": params.get("From"), "helpline": helpline}
     base = settings.public_base_url.rstrip("/")
     return _twiml_xml(
         f'<Say language="en-IN">{escape(VOICE_GREETING)}</Say>'
@@ -182,7 +185,8 @@ async def inbound_voice_recording(request: Request, background: BackgroundTasks)
     _verify(request, params, settings)
     if params.get("RecordingStatus", "completed") != "completed" or not params.get("RecordingUrl"):
         return Response(status_code=204)
-    sender = request.app.state.pending_calls.pop(params.get("CallSid", ""), None) or params.get("From")
+    pending = request.app.state.pending_calls.pop(params.get("CallSid", ""), None) or {}
+    sender = pending.get("from") or params.get("From")
     try:
         async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
             resp = await client.get(params["RecordingUrl"] + ".wav",
@@ -194,7 +198,7 @@ async def inbound_voice_recording(request: Request, background: BackgroundTasks)
         return Response(status_code=204)
     created = create_report(
         request.app.state.engine, settings, channel="call", text="", sender=sender, audio_name=name,
-        call_seconds=seconds, provider_message_id=params.get("RecordingSid") or None,
+        call_seconds=seconds, provider_message_id=params.get("RecordingSid") or None, helpline=pending.get("helpline"),
     )
     if created.is_new:
         schedule_call(request, background, created.report_id)
@@ -208,6 +212,7 @@ async def simulator_call(
     from_: str = Form(..., alias="from", min_length=5, max_length=32),
     audio: UploadFile = File(...),
     transcript_hint: str | None = Form(None, max_length=5000),
+    to: str | None = Form(None, max_length=32),
 ):
     """Demo only: a recorded call from the browser goes through the same path as a real call.
     `transcript_hint` stands in for speech recognition when no speech model is installed."""
@@ -223,8 +228,15 @@ async def simulator_call(
         name, seconds = _store_audio(data, settings)
     except AudioRejected as exc:
         raise APIError(exc.status, exc.code, exc.message) from exc
+    helpline = None
+    if to:  # the helpline number dialled, matched the same way as Twilio's `To`
+        with request.app.state.engine.connect() as conn:
+            helpline = helplines.match(conn, to)
+        if helpline is None:
+            raise APIError(400, "VALIDATION_ERROR", "That number is not a registered helpline.",
+                           {"fields": [{"field": "to", "message": "Not a helpline."}]})
     created = create_report(request.app.state.engine, settings, channel="call", text="", sender=from_,
-                            audio_name=name, call_seconds=seconds)
+                            audio_name=name, call_seconds=seconds, helpline=helpline)
     schedule_call(request, background, created.report_id, (transcript_hint or "").strip() or None)
     return {"report_id": created.report_id, "reference": created.reference,
             "reply": call_reply_text(created.reference, settings)}

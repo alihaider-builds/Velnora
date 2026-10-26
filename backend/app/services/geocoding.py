@@ -24,6 +24,8 @@ from app.services.normalize import normalize
 from app.timeutil import now_iso
 
 GOOGLE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
+GOOGLE_AUTOCOMPLETE_URL = "https://places.googleapis.com/v1/places:autocomplete"
+PK_BBOX = "60.87,23.69,77.84,37.08"  # min lng, min lat, max lng, max lat
 MAX_VARIANTS = 4
 
 
@@ -68,6 +70,78 @@ class Geocoder:
             if found:
                 return found
         return []
+
+    async def suggest(self, query: str, limit: int = 6) -> list[dict]:
+        """Type-ahead suggestions for a place name (Google Places Autocomplete, or Photon on
+        OpenStreetMap data — Nominatim's policy forbids autocomplete). Pakistan only, cached."""
+        key = f"suggest:{self.provider}:{normalize(query)}"
+        with self.engine.connect() as conn:
+            row = conn.execute(select(geocode_cache.c.results).where(geocode_cache.c.query_norm == key)).first()
+        if row is not None:
+            return row.results[:limit]
+        if not self.settings.geocoder_enabled:
+            return []
+        items = await (self._google_suggest(query) if self.provider == "google" else self._photon(query, limit))
+        with self.engine.begin() as conn:
+            conn.execute(
+                insert(geocode_cache).prefix_with("OR REPLACE"),
+                {"query_norm": key, "results": items, "fetched_at": now_iso()},
+            )
+        return items[:limit]
+
+    async def _photon(self, query: str, limit: int) -> list[dict]:
+        try:
+            async with httpx.AsyncClient(timeout=8) as client:
+                resp = await client.get(
+                    f"{self.settings.photon_url.rstrip('/')}/api/",
+                    params={"q": query, "limit": limit * 2, "lang": "en", "bbox": PK_BBOX},
+                    headers={"User-Agent": self.settings.nominatim_user_agent},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            raise GeocoderUnavailable(str(exc)) from exc
+        out, seen = [], set()
+        for f in data.get("features", []):
+            p = f.get("properties", {})
+            coords = (f.get("geometry") or {}).get("coordinates") or []
+            if p.get("countrycode", "PK").upper() != "PK" or len(coords) != 2 or not p.get("name"):
+                continue
+            parts = [p["name"]]
+            for k in ("district", "locality", "city", "county", "state"):
+                v = p.get(k)
+                if v and all(v.lower() != x.lower() for x in parts):
+                    parts.append(v)
+            label = ", ".join(parts)
+            if label.lower() in seen:
+                continue
+            seen.add(label.lower())
+            out.append({"label": label, "name": p["name"], "lat": float(coords[1]), "lng": float(coords[0])})
+        return out[:limit]
+
+    async def _google_suggest(self, query: str) -> list[dict]:
+        try:
+            async with httpx.AsyncClient(timeout=8) as client:
+                resp = await client.post(
+                    GOOGLE_AUTOCOMPLETE_URL,
+                    json={"input": query, "includedRegionCodes": ["pk"], "languageCode": "en"},
+                    headers={"X-Goog-Api-Key": self.settings.google_maps_api_key},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            raise GeocoderUnavailable(str(exc)) from exc
+        out = []
+        for s in data.get("suggestions", []):
+            pred = s.get("placePrediction")
+            if not pred:
+                continue
+            fmt = pred.get("structuredFormat") or {}
+            name = (fmt.get("mainText") or {}).get("text") or (pred.get("text") or {}).get("text", "")
+            label = (pred.get("text") or {}).get("text") or name
+            # Autocomplete gives no coordinates; the reviewer's map search resolves the name later.
+            out.append({"label": label, "name": name, "lat": None, "lng": None})
+        return out
 
     async def _search_one(self, query: str, limit: int) -> list[dict]:
         key = f"{self.provider}:{normalize(query)}"

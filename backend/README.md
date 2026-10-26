@@ -49,6 +49,7 @@ The model sits behind one interface (`app/services/llm/`), so it can be swapped 
 ## Helpline calls and transcription
 
 - **Real calls (optional):** point a Twilio number's voice webhook at `/api/inbound/voice`. Callers hear a recording notice, leave a message after the beep, and the recording arrives at `/api/inbound/voice/recording`.
+- **Helpline numbers:** the organizer adds them on the dashboard. A normal mobile number (e.g. a Jazz/Zong SIM) can't send calls to a server by itself: forward its calls to your Twilio number and enter that number as "Forwards to". Calls are matched to the helpline and the report shows which line was called.
 - **Demo:** the simulator's Call tab records from the microphone (or takes an audio file) and posts it to `/api/simulator/call`.
 - **Transcription with Gemma 4:** `pip install -e ".[audio]"`, then `TRANSCRIBER_BACKEND=gemma`. Gemma 4 E2B/E4B transcribe speech through Hugging Face Transformers (not Ollama), 30 seconds at a time, so calls are split into 30-second chunks. The first run downloads several GB.
 - **Without a speech model:** recordings are kept, the report shows "Needs transcript", and the reviewer listens and types it. The AI then reads the text as usual.
@@ -61,12 +62,13 @@ Six built-ins are created automatically. The organizer adds more from the dashbo
 
 - `GOOGLE_MAPS_API_KEY` (server) switches place search to Google's Geocoding API; the frontend's `VITE_GOOGLE_MAPS_API_KEY` (browser key) switches the basemap to Google map tiles. Without keys everything uses OpenStreetMap.
 - If a full place phrase finds nothing, broader versions are tried: "Lalkurti, Cantt, Rawalpindi" → "Cantt, Rawalpindi" → "Rawalpindi".
+- The public "Where?" field suggests places as you type (Google Places Autocomplete with a key; otherwise [Photon](https://photon.komoot.io) on OpenStreetMap data, since Nominatim forbids autocomplete). `GET /api/places/suggest?q=`.
 - Reviewers can always click the map, drag the pin, or type coordinates / paste a Google Maps link.
 
 ## Tests, lint and evaluation
 
 ```bash
-pytest                       # 84 tests; no GPU, model or network needed
+pytest                       # 91 tests; no GPU, model or network needed
 ruff check app tests ../eval
 python ../eval/run_eval.py   # writes eval/results.md  (add --geocode to test map search)
 ```

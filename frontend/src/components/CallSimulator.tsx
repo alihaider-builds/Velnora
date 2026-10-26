@@ -1,7 +1,8 @@
 import { ArrowRight, Info, Mic, PhoneCall, Square, Upload } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
-import { useHealth, useSimulatorCall } from '../api/hooks'
+import { useHealth, useHelplines, useSimulatorCall } from '../api/hooks'
+import { formatPhone } from '../lib/format'
 import { toWav16k } from '../lib/wav'
 import { Spinner, errorMessage } from './ui'
 
@@ -14,6 +15,9 @@ const DEMO_TRANSCRIPT =
 export function CallSimulator({ from }: { from: string }) {
   const health = useHealth()
   const call = useSimulatorCall()
+  const helplines = useHelplines().data?.items ?? []
+  const [to, setTo] = useState('')
+  const dialled = to || helplines[0]?.number || ''
   const [recording, setRecording] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const [audio, setAudio] = useState<{ wav: Blob; seconds: number; url: string } | null>(null)
@@ -94,6 +98,7 @@ export function CallSimulator({ from }: { from: string }) {
     if (!audio) return
     const form = new FormData()
     form.append('from', from)
+    if (dialled) form.append('to', dialled)
     form.append('audio', audio.wav, 'call.wav')
     if (hint.trim()) form.append('transcript_hint', hint.trim())
     call.mutate(form, {
@@ -107,6 +112,30 @@ export function CallSimulator({ from }: { from: string }) {
       className="flex flex-1 flex-col gap-3 overflow-y-auto p-4"
       style={{ backgroundColor: 'var(--chat-sms-bg)' }}
     >
+      <div className="flex flex-col gap-1 rounded-lg bg-surface p-3">
+        <label htmlFor="call-to" className="text-xs font-semibold text-muted">
+          Helpline being called
+        </label>
+        {helplines.length ? (
+          <select
+            id="call-to"
+            className="input text-sm"
+            value={dialled}
+            onChange={(e) => setTo(e.target.value)}
+          >
+            {helplines.map((h) => (
+              <option key={h.number} value={h.number}>
+                {h.label} — {formatPhone(h.number)}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <p id="call-to" className="text-sm text-muted">
+            No helpline numbers yet. The organizer adds them on the Dashboard.
+          </p>
+        )}
+      </div>
+
       <p className="flex gap-2 rounded-lg bg-surface p-3 text-sm">
         <Info size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-primary" />
         <span>
