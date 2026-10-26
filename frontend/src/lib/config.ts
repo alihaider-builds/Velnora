@@ -3,7 +3,8 @@ export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
 
 /** Key-free basemap (LAPTOP_B_FRONTEND §3). Attribution comes from the style's tile source. */
 export const BASEMAP_STYLE = {
-  light: 'https://tiles.openfreemap.org/styles/positron',
+  // "liberty" shows water, parks and roads in colour, so the map is easier to read than grey.
+  light: 'https://tiles.openfreemap.org/styles/liberty',
   dark: 'https://tiles.openfreemap.org/styles/dark',
 }
 

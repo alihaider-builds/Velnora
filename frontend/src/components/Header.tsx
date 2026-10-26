@@ -78,6 +78,11 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-surface/95 backdrop-blur">
+      <div
+        aria-hidden="true"
+        className="h-[3px]"
+        style={{ background: 'linear-gradient(90deg, var(--primary), var(--ai), var(--verified))' }}
+      />
       <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-4 py-2">
         <Link
           to="/"

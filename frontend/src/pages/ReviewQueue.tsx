@@ -363,7 +363,7 @@ export function ReviewQueue() {
         </div>
         <fieldset>
           <legend className="text-xs font-semibold text-muted">Channel</legend>
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-1">
             {CHANNEL_ORDER.map((c) => {
               const Icon = CHANNELS[c].icon
               const active = channels.includes(c)
@@ -383,7 +383,7 @@ export function ReviewQueue() {
         </fieldset>
         <fieldset>
           <legend className="text-xs font-semibold text-muted">Your urgency</legend>
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-1">
             {URGENCY_FILTERS.map((u) => {
               const active = urgencies.includes(u)
               return (

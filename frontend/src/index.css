@@ -52,6 +52,16 @@
     color: var(--text);
   }
 
+  /* A faint brand wash at the top of every page so plain screens don't look flat. */
+  body {
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--primary) 7%, var(--bg)) 0,
+      var(--bg) 360px
+    );
+    background-repeat: no-repeat;
+  }
+
   body {
     font-family: var(--font-sans);
     font-size: 16px;
@@ -126,6 +136,20 @@
     background-color: var(--primary);
     border-color: var(--primary);
     color: var(--primary-contrast);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 30%, transparent);
+  }
+  .btn-primary:disabled {
+    box-shadow: none;
+  }
+
+  /* Highlighted summary card (public map headline, submit intro). */
+  .hero-card {
+    background-image: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--primary) 11%, var(--surface)),
+      color-mix(in srgb, var(--verified) 9%, var(--surface))
+    );
+    box-shadow: var(--shadow-sm);
   }
   .btn-primary:hover:not(:disabled) {
     background-color: var(--primary);

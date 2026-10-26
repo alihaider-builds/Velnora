@@ -1,4 +1,4 @@
-import { Camera, Lock, MapPin, Phone, Send, Trash2 } from 'lucide-react'
+import { Camera, Languages, Lock, MapPin, Phone, Send, Trash2, UserCheck } from 'lucide-react'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { ApiError } from '../api/client'
@@ -199,11 +199,38 @@ export function Submit() {
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-8 sm:py-10">
-      <h1 className="text-3xl font-bold tracking-tight">Submit a report</h1>
-      <p className="mt-2 text-muted">
-        Tell us what is happening and what is needed — in Urdu, Roman Urdu or English. A reviewer
-        checks every report before anything appears on the public map.
-      </p>
+      <div className="hero-card rounded-xl border border-border p-5 sm:p-6">
+        <div className="flex items-start gap-4">
+          <span
+            aria-hidden="true"
+            className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary text-on-primary sm:flex"
+          >
+            <Send size={22} />
+          </span>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Submit a report</h1>
+            <p className="mt-2 text-muted">
+              Tell us what is happening and what is needed — in Urdu, Roman Urdu or English. A
+              reviewer checks every report before anything appears on the public map.
+            </p>
+          </div>
+        </div>
+        <ul className="mt-4 flex flex-wrap gap-2 text-sm">
+          {[
+            { icon: Languages, text: 'اردو · Roman Urdu · English' },
+            { icon: UserCheck, text: 'Checked by a person' },
+            { icon: Lock, text: 'Phone numbers stay private' },
+          ].map(({ icon: Icon, text }) => (
+            <li
+              key={text}
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1"
+            >
+              <Icon size={14} aria-hidden="true" className="text-primary" />
+              {text}
+            </li>
+          ))}
+        </ul>
+      </div>
 
       {helplines.length > 0 && (
         <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">

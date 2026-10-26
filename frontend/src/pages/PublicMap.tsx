@@ -78,6 +78,18 @@ function ReportsMap({
         clusterRadius: 40,
         clusterMaxZoom: 11,
       })
+      // Soft halo under clusters and pins so they stand out on a busy basemap (not clickable).
+      map.addLayer({
+        id: 'clusters-halo',
+        type: 'circle',
+        source: SOURCE,
+        filter: ['has', 'point_count'],
+        paint: {
+          'circle-color': cssVar('var(--primary)'),
+          'circle-radius': ['step', ['get', 'point_count'], 26, 5, 31, 10, 36],
+          'circle-opacity': 0.22,
+        },
+      })
       map.addLayer({
         id: 'clusters',
         type: 'circle',
@@ -85,7 +97,7 @@ function ReportsMap({
         filter: ['has', 'point_count'],
         paint: {
           'circle-color': cssVar('var(--primary)'),
-          'circle-radius': ['step', ['get', 'point_count'], 16, 5, 20, 10, 24],
+          'circle-radius': ['step', ['get', 'point_count'], 17, 5, 21, 10, 25],
           'circle-stroke-width': 3,
           'circle-stroke-color': '#ffffff',
         },
@@ -103,14 +115,26 @@ function ReportsMap({
         paint: { 'text-color': '#ffffff' },
       })
       map.addLayer({
+        id: 'pins-halo',
+        type: 'circle',
+        source: SOURCE,
+        filter: ['!', ['has', 'point_count']],
+        paint: {
+          'circle-color': needColor,
+          'circle-radius': 18,
+          'circle-opacity': 0.25,
+          'circle-blur': 0.3,
+        },
+      })
+      map.addLayer({
         id: 'pins',
         type: 'circle',
         source: SOURCE,
         filter: ['!', ['has', 'point_count']],
         paint: {
           'circle-color': needColor,
-          'circle-radius': 9,
-          'circle-stroke-width': 2.5,
+          'circle-radius': 10,
+          'circle-stroke-width': 3,
           'circle-stroke-color': '#ffffff',
         },
       })
@@ -235,8 +259,12 @@ export function PublicMap() {
 
   const panel = (p: string) => (
     <div className="flex flex-col gap-5">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Verified needs</h1>
+      <div className="hero-card rounded-xl border border-border p-4">
+        <p className="eyebrow flex items-center gap-1.5">
+          <ShieldCheck size={14} aria-hidden="true" className="text-verified-ink" />
+          Reviewer-approved
+        </p>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight">Verified needs</h1>
         {loading ? (
           <Skeleton className="mt-2 h-6 w-40" />
         ) : (
