@@ -62,6 +62,11 @@ class Settings(BaseSettings):
     sms_gateway_api_url: str = "https://api.sms-gate.app/3rdparty/v1"
     sms_gateway_username: str = ""
     sms_gateway_password: str = ""
+    # SMS to your own SIM via textbee (textbee.dev) on the helpline phone
+    textbee_signing_secret: str = ""  # 20+ characters; sent to textbee when the dashboard connects
+    textbee_api_key: str = ""  # textbee dashboard API key (connect + reply SMS)
+    textbee_reply: bool = False
+    textbee_api_url: str = "https://api.textbee.dev/api/v1"
     # Requests that arrive through a Cloudflare tunnel may only reach the /api/inbound/* webhooks, so a
     # public tunnel never exposes sign-in or report data.
     tunnel_inbound_only: bool = True

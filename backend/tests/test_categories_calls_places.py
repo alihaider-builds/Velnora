@@ -248,3 +248,10 @@ def test_google_errors_become_502(tmp_path):
     with TestClient(create_app(settings)) as c:
         c.post("/api/auth/login", json={"password": PASSWORD})
         assert c.get("/api/geocode", params={"q": "Buner"}).status_code == 502
+
+
+def test_english_plurals_count_as_needs():
+    text = "5 houses take a part of flood and urgent need of shelters for 5 families in lake view city lahore"
+    out = heuristic_extract(text, None)
+    assert [n["category"] for n in out["needs"]] == ["shelter"]
+    assert out["needs"][0]["evidence"] == {"phrase": "shelters"}

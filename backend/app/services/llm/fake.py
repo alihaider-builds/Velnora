@@ -29,7 +29,7 @@ NEED_TERMS: dict[str, list[str]] = {
         "کھانا", "راشن", "روٹی", "آٹا", "بھوک", "دودھ",
     ],
     "shelter": [
-        "tent", "tents", "khaima", "shelter", "ghar gir", "ghar toot", "makan gir", "sar chupane",
+        "tent", "tents", "khaima", "shelter", "ghar gir", "ghar toot", "makan gir", "sar chupane", "homeless",
         "خیمہ", "ٹینٹ", "پناہ", "گھر گر",
     ],
 }
@@ -110,7 +110,9 @@ _EN_MARKERS = {"the", "and", "is", "are", "need", "needs", "water", "we", "our",
 
 def _term_pattern(term: str) -> re.Pattern:
     if term.isascii():
-        return re.compile(_LATIN_BOUND_L + re.escape(term) + _LATIN_BOUND_R, re.IGNORECASE)
+        # English plurals count too ("shelters", "medicines", "tents")
+        plural = "(?:e?s)?" if term[-1:].isalpha() else ""
+        return re.compile(_LATIN_BOUND_L + re.escape(term) + plural + _LATIN_BOUND_R, re.IGNORECASE)
     return re.compile(re.escape(term))
 
 

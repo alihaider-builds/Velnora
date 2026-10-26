@@ -35,6 +35,7 @@ import type {
   SmsGatewayRegisterRequest,
   SmsGatewayRegistered,
   SmsGatewayStatus,
+  TextbeeRegisterRequest,
   TranscriptRequest,
 } from './types'
 
@@ -374,6 +375,15 @@ export function useRegisterSmsGateway() {
   return useMutation({
     mutationFn: (body: SmsGatewayRegisterRequest) =>
       api.post<SmsGatewayRegistered>('/api/sms-gateway/register', body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sms-gateway'] }),
+  })
+}
+
+export function useRegisterTextbee() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: TextbeeRegisterRequest) =>
+      api.post<SmsGatewayRegistered>('/api/sms-gateway/textbee/register', body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['sms-gateway'] }),
   })
 }

@@ -389,6 +389,14 @@ export interface SmsGatewayStatus {
   webhook_path: string
   last_received_at: string | null
   received_24h: number
+  textbee_configured: boolean
+  textbee_has_api_key: boolean
+  textbee_reply_enabled: boolean
+}
+
+export interface TextbeeRegisterRequest {
+  public_url: string
+  api_key?: string
 }
 
 export interface SmsGatewayRegisterRequest {

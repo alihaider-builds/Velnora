@@ -115,7 +115,8 @@ def test_status_shows_received_sms(tmp_path):
         c.post("/api/auth/login", json={"password": PASSWORD})
         before = c.get("/api/sms-gateway/status").json()
         assert before == {"configured": True, "reply_enabled": False, "has_credentials": False,
-                          "webhook_path": "/api/inbound/sms-gateway", "last_received_at": None, "received_24h": 0}
+                          "webhook_path": "/api/inbound/sms-gateway", "last_received_at": None, "received_24h": 0,
+                          "textbee_configured": False, "textbee_has_api_key": False, "textbee_reply_enabled": False}
         post(c, event())
         after = c.get("/api/sms-gateway/status").json()
         assert after["received_24h"] == 1 and after["last_received_at"]

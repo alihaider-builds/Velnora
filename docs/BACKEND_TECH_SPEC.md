@@ -752,6 +752,12 @@ The emergency number comes from `HELPLINE_EMERGENCY_NUMBER`. The reply never con
 - **Tunnel guard:** with `TUNNEL_INBOUND_ONLY=true` (default) any request carrying Cloudflare's `cf-ray`/`cf-connecting-ip` headers is refused (`403 TUNNEL_PATH_BLOCKED`) unless its path starts with `/api/inbound/`.
 - **Reply (optional, `SMS_GATEWAY_REPLY=true`):** the §16.3 text is sent back through `POST {SMS_GATEWAY_API_URL}/messages` (`{"textMessage":{"text"},"phoneNumbers":[sender],"simNumber"}`, basic auth), after the response; failures are logged and never lose the report.
 
+### 16.3b SMS to an ordinary SIM (textbee)
+`POST /api/inbound/textbee` receives [textbee](https://textbee.dev/docs/webhooks) `MESSAGE_RECEIVED` webhooks (flat JSON: `smsId`, `message`, `sender`, `deviceId`, `webhookEvent`, `idempotencyKey`, `receivedAt`).
+- **Auth:** `X-Signature` = lowercase hex HMAC-SHA256(`TEXTBEE_SIGNING_SECRET`, raw body); mismatch → `401 INVALID_SIGNATURE`; secret unset or < 20 chars → `503`. Other events → `204`.
+- **Effect:** `sms` report, idempotent on `idempotencyKey` (fallback `smsId`); optional reply via `POST {TEXTBEE_API_URL}/gateway/send-sms` (`recipients`, `message`, `deviceId`; `x-api-key`).
+- **Connect (reviewer):** `POST /api/sms-gateway/textbee/register` `{ public_url, api_key? }` creates the subscription (`deliveryUrl`, `signingSecret`, `events: ["MESSAGE_RECEIVED"]`) or PATCHes the existing one for this path → `{ webhook_url, webhook_id, replaced }`. `GET /api/sms-gateway/status` adds `textbee_configured`, `textbee_has_api_key`, `textbee_reply_enabled`.
+
 ### 16.4 Connecting real channels (P1, only after C4)
 - Create a Twilio account; for WhatsApp, use the **Twilio WhatsApp Sandbox** (testers join it by sending a join code). Trial accounts can usually only message verified numbers, so add the demo phones as verified numbers.
 - Run a tunnel (e.g. `cloudflared tunnel --url http://localhost:8000`) and set `PUBLIC_BASE_URL` to its URL.

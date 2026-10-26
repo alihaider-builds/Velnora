@@ -46,6 +46,16 @@ The model sits behind one interface (`app/services/llm/`), so it can be swapped 
 - **Demo:** `POST /api/simulator/send` (demo mode only) goes through exactly the same code as real messages.
 - **Real channels (optional):** set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and `PUBLIC_BASE_URL` (a tunnel such as `cloudflared tunnel --url http://localhost:8000`), then point Twilio's incoming-message webhooks at `/api/inbound/sms` and `/api/inbound/whatsapp`. Every request's Twilio signature is verified. See spec §16.4.
 
+### SMS to your own helpline SIM with textbee (recommended)
+[textbee](https://textbee.dev) (open source) runs on the Android phone with the helpline SIM and forwards each SMS to `/api/inbound/textbee`.
+1. Create a free account at textbee.dev; in its dashboard **Register device** shows a QR code: scan it with the textbee app on the helpline phone. Allow SMS access and switch on **Receive SMS**.
+2. Copy the **API key** from the textbee dashboard.
+3. Start the tunnel: `cloudflared tunnel --url http://localhost:8000`.
+4. ReliefLens **Dashboard → SMS to the helpline number → textbee**: paste the tunnel address and the API key, click **Connect**. This creates the textbee `MESSAGE_RECEIVED` webhook with `TEXTBEE_SIGNING_SECRET` from `.env` (re-connecting after a tunnel restart moves the same webhook).
+5. Optional reply SMS: `TEXTBEE_REPLY=true` and `TEXTBEE_API_KEY` in `.env`.
+
+Webhooks are verified (`X-Signature` = hex HMAC-SHA256 of the raw body) and idempotent on textbee's `idempotencyKey`.
+
 ### SMS to your own helpline SIM (Android SMS gateway, free)
 An ordinary SIM can't send texts to a server by itself, so an Android phone holding the helpline SIM runs the open-source
 [SMS Gateway for Android](https://sms-gate.app) app, which forwards every received SMS to `/api/inbound/sms-gateway`.
@@ -82,7 +92,7 @@ Six built-ins are created automatically. The organizer adds more from the dashbo
 ## Tests, lint and evaluation
 
 ```bash
-pytest                       # 102 tests; no GPU, model or network needed
+pytest                       # 107 tests; no GPU, model or network needed
 ruff check app tests ../eval
 python ../eval/run_eval.py   # writes eval/results.md  (add --geocode to test map search)
 ```

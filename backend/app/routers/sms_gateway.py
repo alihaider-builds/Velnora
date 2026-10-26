@@ -11,8 +11,8 @@ from app.auth import require_reviewer
 from app.db import reports
 from app.errors import APIError
 from app.routers.deps import schedule_extraction
-from app.schemas import SmsGatewayRegister, SmsGatewayRegistered, SmsGatewayStatus
-from app.services import audit, helplines, sms_gateway
+from app.schemas import SmsGatewayRegister, SmsGatewayRegistered, SmsGatewayStatus, TextbeeRegister
+from app.services import audit, helplines, sms_gateway, textbee
 from app.services.channels import create_report, reply_text
 from app.timeutil import to_iso, utcnow
 
@@ -24,7 +24,7 @@ reviewer = [Depends(require_reviewer)]
 def gateway_status(request: Request):
     settings = request.app.state.settings
     since = to_iso(utcnow() - timedelta(hours=24))
-    gw = reports.c.provider_message_id.like("smsgate:%")
+    gw = reports.c.provider_message_id.like("smsgate:%") | reports.c.provider_message_id.like("textbee:%")
     with request.app.state.engine.connect() as conn:
         last = conn.execute(select(func.max(reports.c.created_at)).where(gw)).scalar()
         recent = conn.execute(select(func.count()).where(gw, reports.c.created_at >= since)).scalar() or 0
@@ -35,6 +35,9 @@ def gateway_status(request: Request):
         "webhook_path": sms_gateway.WEBHOOK_PATH,
         "last_received_at": last,
         "received_24h": recent,
+        "textbee_configured": len(settings.textbee_signing_secret) >= 20,
+        "textbee_has_api_key": bool(settings.textbee_api_key),
+        "textbee_reply_enabled": textbee.reply_enabled(settings),
     }
 
 
@@ -94,4 +97,60 @@ async def inbound_sms_gateway(request: Request, background: BackgroundTasks):
         if sms_gateway.reply_enabled(settings):
             sim = payload.get("simNumber") if isinstance(payload.get("simNumber"), int) else None
             background.add_task(sms_gateway.send_reply, settings, sender, reply_text(created.reference, settings), sim)
+    return JSONResponse({"reference": created.reference, "duplicate": not created.is_new}, status_code=200)
+
+
+# ---------- textbee ----------
+
+@router.post("/sms-gateway/textbee/register", response_model=SmsGatewayRegistered, dependencies=reviewer)
+async def textbee_register(body: TextbeeRegister, request: Request):
+    """Create the textbee MESSAGE_RECEIVED webhook pointing here, with our signing secret.
+    An API key typed in the dashboard is used for this one call and never stored."""
+    settings = request.app.state.settings
+    if len(settings.textbee_signing_secret) < 20:
+        raise APIError(409, "CHANNEL_NOT_CONFIGURED", "Set TEXTBEE_SIGNING_SECRET in .env first.")
+    api_key = (body.api_key or "").strip() or settings.textbee_api_key
+    if not api_key:
+        raise APIError(400, "VALIDATION_ERROR", "Enter the textbee API key.")
+    try:
+        result = await textbee.register_webhook(settings, body.public_url, api_key)
+    except sms_gateway.GatewayRejected as exc:
+        raise APIError(exc.status, exc.code, exc.message) from exc
+    with request.app.state.engine.begin() as conn:
+        audit.record(conn, "sms-gateway", "textbee_webhook_registered",
+                     details={"webhook_url": result["webhook_url"], "replaced": result["replaced"]})
+    return result
+
+
+@router.post("/inbound/textbee")
+async def inbound_textbee(request: Request, background: BackgroundTasks):
+    settings = request.app.state.settings
+    raw = await request.body()
+    try:
+        textbee.verify(settings, raw, request.headers.get("X-Signature", ""))
+    except sms_gateway.GatewayRejected as exc:
+        raise APIError(exc.status, exc.code, exc.message) from exc
+    try:
+        event = json.loads(raw)
+        kind = event.get("webhookEvent")
+    except (ValueError, AttributeError) as exc:
+        raise APIError(400, "VALIDATION_ERROR", "Body must be textbee's JSON event.") from exc
+    if kind != textbee.EVENT_RECEIVED:
+        return Response(status_code=204)  # sent/delivered/failed updates are not reports
+    text = str(event.get("message") or "").strip()
+    sender = str(event.get("sender") or "").strip()
+    if not text or sum(c.isdigit() for c in sender) < 5:
+        return Response(status_code=204)
+
+    # textbee keeps the idempotency key (and smsId) the same across retries.
+    message_id = event.get("idempotencyKey") or event.get("smsId")
+    created = create_report(
+        request.app.state.engine, settings, channel="sms", text=text, sender=sender,
+        provider_message_id=f"textbee:{message_id}" if message_id else None,
+    )
+    if created.is_new:
+        schedule_extraction(request, background, created.report_id)
+        if textbee.reply_enabled(settings):
+            background.add_task(textbee.send_reply, settings, sender, reply_text(created.reference, settings),
+                                event.get("deviceId"))
     return JSONResponse({"reference": created.reference, "duplicate": not created.is_new}, status_code=200)

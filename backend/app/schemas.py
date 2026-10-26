@@ -375,12 +375,20 @@ class SmsGatewayStatus(BaseModel):
     webhook_path: str
     last_received_at: str | None
     received_24h: int
+    textbee_configured: bool = False  # signing secret set: textbee webhooks are accepted
+    textbee_has_api_key: bool = False
+    textbee_reply_enabled: bool = False
 
 
 class SmsGatewayRegister(BaseModel):
     public_url: str = Field(pattern=r"^https://[A-Za-z0-9.-]+(:[0-9]+)?/?$", max_length=200)
     username: str | None = Field(default=None, max_length=100)
     password: str | None = Field(default=None, max_length=200)
+
+
+class TextbeeRegister(BaseModel):
+    public_url: str = Field(pattern=r"^https://[A-Za-z0-9.-]+(:[0-9]+)?/?$", max_length=200)
+    api_key: str | None = Field(default=None, max_length=200)
 
 
 class SmsGatewayRegistered(BaseModel):
