@@ -9,10 +9,12 @@ from fastapi.responses import JSONResponse
 from app.config import Settings
 from app.db import make_engine
 from app.errors import error_body, install_error_handlers
-from app.routers import auth, geocode, health, inbound, public, reports
+from app.routers import auth, categories, geocode, health, inbound, public, reports
+from app.services.categories import ensure_builtins
 from app.services.channels import new_session_secret
 from app.services.geocoding import Geocoder
 from app.services.llm import build_llm_client
+from app.services.transcription import build_transcriber
 
 log = logging.getLogger("relieflens")
 
@@ -29,7 +31,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
     app.state.engine = make_engine(settings.resolve(settings.database_path))
+    ensure_builtins(app.state.engine)
     app.state.llm = build_llm_client(settings)
+    app.state.transcriber = build_transcriber(settings)
+    app.state.pending_calls = {}  # CallSid -> caller number, until the recording arrives
     app.state.geocoder = Geocoder(settings, app.state.engine)
     app.state.session_secret = settings.session_secret or new_session_secret()
     if not settings.session_secret:
@@ -53,7 +58,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             allow_headers=["*"],
         )
 
-    for module in (health, auth, reports, public, geocode, inbound):
+    for module in (health, auth, reports, categories, public, geocode, inbound):
         app.include_router(module.router)
     return app
 

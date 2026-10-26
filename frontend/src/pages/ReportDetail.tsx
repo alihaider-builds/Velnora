@@ -3,17 +3,23 @@ import { ArrowLeft, Eye, Keyboard, MapPin, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { api, ApiError } from '../api/client'
-import { keys, useOriginal, useReport, useReports, useReview } from '../api/hooks'
+import { keys, useNeeds, useOriginal, useReport, useReports, useReview } from '../api/hooks'
 import type { OriginalResponse, ReportListResponse, ReviewAction, Urgency } from '../api/types'
 import { ActionBar } from '../components/ActionBar'
 import { AiSuggestions, evidenceFields } from '../components/AiSuggestions'
 import { AuditTimeline } from '../components/AuditTimeline'
-import { ChannelBadge, DemoTag, LanguageBadge, StatusBadge } from '../components/badges'
+import {
+  ChannelBadge,
+  DemoTag,
+  LanguageBadge,
+  StatusBadge,
+  UrgencyBadge,
+} from '../components/badges'
+import { CallPanel } from '../components/CallPanel'
 import { ConfirmDialog, Dialog } from '../components/Dialog'
 import { DuplicatesPanel, MergePicker } from '../components/Duplicates'
 import { EvidenceText, type HighlightRange } from '../components/EvidenceText'
 import { LocationPicker } from '../components/LocationPicker'
-import { PriorityWhy } from '../components/Priority'
 import { useToast } from '../components/Toast'
 import { EmptyState, ErrorState, Skeleton, errorMessage } from '../components/ui'
 import { UserText } from '../components/UserText'
@@ -97,7 +103,7 @@ function ReportDetailView({ id }: { id: string }) {
   }, [extracting])
 
   // Queue order for J/K and "next pending report".
-  const queue = useReports({ status: ['pending_review'], sort: 'priority', page_size: 100 })
+  const queue = useReports({ status: ['pending_review'], sort: 'newest', page_size: 100 })
 
   const review = useReview(id)
   const original = useOriginal(id)
@@ -123,7 +129,11 @@ function ReportDetailView({ id }: { id: string }) {
     setUrgency(report.urgency)
   }
 
-  const fields = useMemo(() => (report ? evidenceFields(report.extraction) : []), [report])
+  const { meta } = useNeeds()
+  const fields = useMemo(
+    () => (report ? evidenceFields(report.extraction, (k) => meta(k).en) : []),
+    [report, meta],
+  )
   const activeKey = hoverKey ?? pinnedKey
   const highlight: HighlightRange | null = useMemo(() => {
     const f = fields.find((x) => x.key === activeKey)
@@ -137,11 +147,11 @@ function ReportDetailView({ id }: { id: string }) {
   const goNext = useCallback(async () => {
     try {
       const res = await qc.fetchQuery({
-        queryKey: keys.reports({ status: ['pending_review'], sort: 'priority', page_size: 2 }),
+        queryKey: keys.reports({ status: ['pending_review'], sort: 'newest', page_size: 2 }),
         queryFn: () =>
           api.get<ReportListResponse>('/api/reports', {
             status: ['pending_review'],
-            sort: 'priority',
+            sort: 'newest',
             page_size: 2,
           }),
         staleTime: 0,
@@ -279,7 +289,7 @@ function ReportDetailView({ id }: { id: string }) {
 
   return (
     <div className="flex flex-1 flex-col">
-      {/* Header — channel, sender, priority */}
+      {/* Header — channel, sender, status */}
       <div className="border-b border-border bg-surface">
         <div className="mx-auto flex max-w-[1600px] flex-col gap-3 px-4 py-4">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -310,8 +320,8 @@ function ReportDetailView({ id }: { id: string }) {
             </button>
           </div>
           <div className="flex flex-wrap items-start gap-3">
-            {report.priority && <PriorityWhy priority={report.priority} />}
             <StatusBadge status={report.status} />
+            <UrgencyBadge urgency={report.urgency} />
             {report.is_synthetic && <DemoTag />}
             {report.sender && report.sender.same_sender_count > 0 && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-medium">
@@ -340,6 +350,7 @@ function ReportDetailView({ id }: { id: string }) {
       <div className="mx-auto grid w-full max-w-[1600px] flex-1 items-start gap-4 px-4 py-4 md:grid-cols-2 xl:grid-cols-3">
         {/* Column 1 — Original report */}
         <Section n={1} title="Original report" aside={<span className="eyebrow">Reported</span>}>
+          <CallPanel key={`${report.id}:${report.call?.transcript_status}`} report={report} />
           <div
             className={
               isMessage
@@ -358,10 +369,14 @@ function ReportDetailView({ id }: { id: string }) {
             {isMessage && (
               <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-muted">
                 <ChannelIcon size={13} aria-hidden="true" /> {CHANNELS[report.channel].label}{' '}
-                message
+                {report.channel === 'call' ? 'transcript' : 'message'}
               </p>
             )}
-            <EvidenceText text={text} highlight={highlight} id="report-text" />
+            {text ? (
+              <EvidenceText text={text} highlight={highlight} id="report-text" />
+            ) : (
+              <p className="text-sm text-muted">No transcript yet.</p>
+            )}
           </div>
 
           {revealed ? (

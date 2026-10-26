@@ -18,6 +18,7 @@ from sqlalchemy import insert, select, update
 from app.config import REPO_DIR, Settings
 from app.db import locations, make_engine, reports
 from app.services import audit
+from app.services.categories import ensure_builtins
 from app.services.channels import create_report
 from app.services.jobs import run_extraction
 from app.services.llm import build_llm_client
@@ -40,6 +41,7 @@ async def seed(settings: Settings, reset: bool = False) -> int:
         for suffix in ("-wal", "-shm"):
             db_path.with_name(db_path.name + suffix).unlink(missing_ok=True)
     engine = make_engine(db_path)
+    ensure_builtins(engine)
     with engine.connect() as conn:
         if conn.execute(select(reports.c.id).where(reports.c.provider_message_id.like("seed-%"))).first():
             print("Samples already loaded. Use --reset to start over.")

@@ -1,16 +1,17 @@
 // Mirrors BACKEND_TECH_SPEC.md §4 exactly. Never add fields here that the contract lacks.
 
 // §4.2 Enumerations
-export type NeedCategory = 'food' | 'clean_water' | 'shelter' | 'medicine' | 'evacuation' | 'other'
+/** Category key from GET /api/categories — built-ins plus ones the organizer adds. */
+export type NeedCategory = string
+export type BuiltinNeed = 'food' | 'clean_water' | 'shelter' | 'medicine' | 'evacuation' | 'other'
 export type Urgency = 'low' | 'medium' | 'high' | 'unknown'
 export type ReportStatus = 'pending_review' | 'approved' | 'rejected' | 'flagged' | 'merged'
 export type ExtractionStatus = 'pending' | 'running' | 'succeeded' | 'failed'
 export type Language = 'roman_urdu' | 'urdu' | 'english' | 'pashto' | 'mixed' | 'unknown'
 export type LocationSource = 'submitter_pin' | 'geocoder_candidate' | 'reviewer_pin'
 export type ReviewAction = 'approve' | 'reject' | 'flag' | 'reopen'
-export type Channel = 'web' | 'sms' | 'whatsapp'
-export type PriorityLevel = 'critical' | 'high' | 'medium' | 'low'
-export type UrgencySource = 'ai_suggestion' | 'reviewer'
+export type Channel = 'web' | 'sms' | 'whatsapp' | 'call'
+export type TranscriptStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'manual'
 
 /** §4.1 — error body for every non-2xx response. */
 export interface ApiErrorBody {
@@ -58,7 +59,6 @@ export interface Extraction {
   quantities: ExtractedQuantity[]
   place_name: ExtractedText | null
   time_reference: ExtractedText | null
-  urgency_suggestion: Urgency | null
   uncertainties: string[]
 }
 
@@ -113,12 +113,24 @@ export interface Sender {
   same_sender_count: number
 }
 
-export interface Priority {
-  score: number
-  level: PriorityLevel
-  reasons: string[]
-  urgency_source: UrgencySource
-  computed_at: string
+/** Present only on call reports. */
+export interface CallInfo {
+  duration_seconds: number | null
+  has_audio: boolean
+  audio_url: string | null
+  transcript_status: TranscriptStatus
+  transcript_model: string | null
+  transcript_error: string | null
+}
+
+export interface Category {
+  key: NeedCategory
+  label: string
+  label_ur: string | null
+  keywords: string[]
+  builtin: boolean
+  active: boolean
+  created_at: string
 }
 
 export interface AuditEntry {
@@ -139,7 +151,7 @@ export interface Report {
   is_synthetic: boolean
   channel: Channel
   sender: Sender | null
-  priority: Priority | null
+  call: CallInfo | null
   source_text: string
   masked_text: string
   has_image: boolean
@@ -161,12 +173,12 @@ export interface ReportListItem {
   created_at: string
   is_synthetic: boolean
   channel: Channel
-  priority: Priority | null
   preview: string
   language: Language | null
   needs: NeedCategory[]
   place: string | null
   extraction_status: ExtractionStatus
+  transcript_status: TranscriptStatus | null
   status: ReportStatus
   urgency: Urgency
   duplicate_count: number
@@ -190,6 +202,9 @@ export interface HealthResponse {
   status: string
   model: string
   model_available: boolean
+  transcriber: string
+  transcriber_available: boolean
+  map_provider: 'google' | 'osm'
   demo_mode: boolean
 }
 
@@ -215,13 +230,13 @@ export interface SimulatorSendResponse {
   reply: string
 }
 
-export type ReportSort = 'priority' | 'newest' | 'oldest'
+export type ReportSort = 'newest' | 'oldest'
 
 export interface ReportListParams {
   status?: ReportStatus[]
   need?: NeedCategory
   channel?: Channel[]
-  priority_level?: PriorityLevel[]
+  urgency?: Urgency[]
   extraction_status?: ExtractionStatus
   q?: string
   sort?: ReportSort
@@ -265,8 +280,9 @@ export interface MergeRequest {
   note?: string
 }
 
+/** Omit `action` to change urgency only. */
 export interface ReviewRequest {
-  action: ReviewAction
+  action?: ReviewAction
   urgency?: Urgency
   note?: string
 }
@@ -287,5 +303,26 @@ export interface ReviewerStats {
   by_need: Partial<Record<NeedCategory, number>>
   by_extraction_status: Partial<Record<ExtractionStatus, number>>
   by_channel: Partial<Record<Channel, number>>
-  by_priority_level: Partial<Record<PriorityLevel, number>>
+  by_urgency: Partial<Record<Urgency, number>>
+}
+
+export interface CategoryListResponse {
+  items: Category[]
+}
+
+export interface CategoryCreateRequest {
+  label: string
+  label_ur?: string
+  keywords?: string[]
+}
+
+export interface CategoryPatchRequest {
+  label?: string
+  label_ur?: string | null
+  keywords?: string[]
+  active?: boolean
+}
+
+export interface TranscriptRequest {
+  text: string
 }

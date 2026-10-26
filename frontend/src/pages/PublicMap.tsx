@@ -3,7 +3,7 @@ import type { GeoJSONSource } from 'maplibre-gl'
 import { ChevronUp, MapPin, Send, ShieldCheck } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
-import { usePublicReports, usePublicStats } from '../api/hooks'
+import { useNeeds, usePublicReports, usePublicStats } from '../api/hooks'
 import type { NeedCategory, PublicReport } from '../api/types'
 import { BarList } from '../components/BarList'
 import { NeedChip } from '../components/badges'
@@ -16,7 +16,7 @@ import {
 } from '../components/MapView'
 import { EmptyState, ErrorState, Skeleton } from '../components/ui'
 import { relativeTime } from '../lib/format'
-import { NEED_ORDER, NEEDS } from '../lib/meta'
+import { NEED_ORDER, NEEDS, type NeedMeta } from '../lib/meta'
 
 const SOURCE = 'public-reports'
 
@@ -25,12 +25,12 @@ function escapeHtml(s: string): string {
 }
 
 /** Popup: need chips, area, approval time, demo tag. Never text, quantities or images (§5.1). */
-function popupHtml(r: PublicReport): string {
+function popupHtml(r: PublicReport, meta: (key: NeedCategory) => NeedMeta): string {
   const chips = r.needs
-    .map(
-      (n) =>
-        `<span style="display:inline-flex;align-items:center;gap:4px;border:1px solid ${cssVar(NEEDS[n].color)};border-radius:999px;padding:1px 8px;font-size:12px;font-weight:600;margin:0 4px 4px 0"><span style="width:8px;height:8px;border-radius:50%;background:${cssVar(NEEDS[n].color)}"></span>${NEEDS[n].en}</span>`,
-    )
+    .map((n) => {
+      const m = meta(n)
+      return `<span style="display:inline-flex;align-items:center;gap:4px;border:1px solid ${cssVar(m.color)};border-radius:999px;padding:1px 8px;font-size:12px;font-weight:600;margin:0 4px 4px 0"><span style="width:8px;height:8px;border-radius:50%;background:${cssVar(m.color)}"></span>${escapeHtml(m.en)}</span>`
+    })
     .join('')
   const demo = r.is_synthetic
     ? `<span style="display:inline-block;margin-top:6px;font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;background:${cssVar('var(--banner-bg)')};color:${cssVar('var(--banner-text)')}">Demo data</span>`
@@ -51,6 +51,11 @@ function ReportsMap({
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const { map, failed } = useMapLibre(ref, { compactAttribution: false })
+  const { meta } = useNeeds()
+  const metaRef = useRef(meta)
+  useEffect(() => {
+    metaRef.current = meta
+  })
   const popup = useRef<maplibregl.Popup | null>(null)
   const byId = useRef(new Map<string, PublicReport>())
 
@@ -117,7 +122,7 @@ function ReportsMap({
         popup.current?.remove()
         popup.current = new maplibregl.Popup({ offset: 12, maxWidth: '260px' })
           .setLngLat([r.lng, r.lat])
-          .setHTML(popupHtml(r))
+          .setHTML(popupHtml(r, metaRef.current))
           .addTo(map)
       }
       const onCluster = async (e: maplibregl.MapLayerMouseEvent) => {
@@ -178,7 +183,7 @@ function ReportsMap({
     popup.current?.remove()
     popup.current = new maplibregl.Popup({ offset: 12, maxWidth: '260px' })
       .setLngLat([r.lng, r.lat])
-      .setHTML(popupHtml(r))
+      .setHTML(popupHtml(r, metaRef.current))
       .addTo(map)
   }, [map, focus])
 
@@ -192,6 +197,7 @@ export function PublicMap() {
   const [needs, setNeeds] = useState<NeedCategory[]>([])
   const [sheetOpen, setSheetOpen] = useState(false)
   const [focus, setFocus] = useState<{ report: PublicReport; seq: number } | null>(null)
+  const { order: needKeys, meta: needInfo } = useNeeds()
   const reports = usePublicReports(needs)
   const stats = usePublicStats()
   const items = useMemo(() => reports.data?.items ?? [], [reports.data])
@@ -210,8 +216,8 @@ export function PublicMap() {
     return out
   }, [filtered, needs, stats.data, items])
   const barNeeds = filtered
-    ? NEED_ORDER.filter((n) => needs.includes(n))
-    : NEED_ORDER.filter((n) => (counts[n] ?? 0) > 0)
+    ? needKeys.filter((n) => needs.includes(n))
+    : needKeys.filter((n) => (counts[n] ?? 0) > 0)
   const barSum = barNeeds.reduce((sum, n) => sum + (counts[n] ?? 0), 0)
 
   const areas = useMemo(() => {
@@ -254,9 +260,10 @@ export function PublicMap() {
       <fieldset>
         <legend className="eyebrow mb-2">Filter by need</legend>
         <div className="flex flex-wrap gap-1.5">
-          {NEED_ORDER.map((n) => {
+          {needKeys.map((n) => {
             const on = needs.includes(n)
-            const Icon = NEEDS[n].icon
+            const m = needInfo(n)
+            const Icon = m.icon
             return (
               <button
                 key={n}
@@ -269,8 +276,8 @@ export function PublicMap() {
                     : 'border-border bg-surface hover:bg-surface-2'
                 }`}
               >
-                <Icon size={14} aria-hidden="true" style={{ color: NEEDS[n].color }} />
-                {NEEDS[n].en}
+                <Icon size={14} aria-hidden="true" style={{ color: m.color }} />
+                {m.en}
               </button>
             )
           })}
@@ -323,7 +330,7 @@ export function PublicMap() {
                 key: n,
                 label: <NeedChip need={n} bilingual />,
                 value: counts[n] ?? 0,
-                color: NEEDS[n].color,
+                color: needInfo(n).color,
               }))}
             />
             {barSum > total && (

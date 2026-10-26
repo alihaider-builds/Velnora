@@ -1,8 +1,14 @@
-"""The exact JSON shape Gemma must return (BACKEND_TECH_SPEC.md §5.2)."""
+"""The exact JSON shape Gemma must return (BACKEND_TECH_SPEC.md §5.2).
 
-from pydantic import BaseModel, Field, field_validator
+Need categories come from the organizer's category list, so the allowed values are
+passed in at validation time and written into the JSON schema sent to the model.
+"""
 
-from app.schemas import Language, NeedCategory, Urgency
+import copy
+
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
+
+from app.schemas import Language
 
 
 class EvidenceOut(BaseModel):
@@ -10,8 +16,16 @@ class EvidenceOut(BaseModel):
 
 
 class NeedOut(BaseModel):
-    category: NeedCategory
+    category: str = Field(min_length=1, max_length=40)
     evidence: EvidenceOut
+
+    @field_validator("category")
+    @classmethod
+    def _known_category(cls, value: str, info: ValidationInfo) -> str:
+        allowed = (info.context or {}).get("categories")
+        if allowed is not None and value not in allowed:
+            raise ValueError(f"category must be one of: {', '.join(sorted(allowed))}")
+        return value
 
 
 class QuantityOut(BaseModel):
@@ -31,7 +45,6 @@ class ExtractionOutput(BaseModel):
     quantities: list[QuantityOut] = Field(max_length=10)
     place_name: TextFieldOut | None
     time_reference: TextFieldOut | None
-    urgency_suggestion: Urgency
     uncertainties: list[str] = Field(max_length=5)
 
     @field_validator("uncertainties")
@@ -40,5 +53,7 @@ class ExtractionOutput(BaseModel):
         return [n.strip()[:200] for n in notes if n.strip()]
 
 
-def output_json_schema() -> dict:
-    return ExtractionOutput.model_json_schema()
+def output_json_schema(category_keys: list[str]) -> dict:
+    schema = copy.deepcopy(ExtractionOutput.model_json_schema())
+    schema["$defs"]["NeedOut"]["properties"]["category"]["enum"] = list(category_keys)
+    return schema

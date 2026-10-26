@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback } from 'react'
+import { needMeta, needOrder } from '../lib/meta'
 import { api, ApiError } from './client'
 import type {
+  Category,
+  CategoryCreateRequest,
+  CategoryListResponse,
+  CategoryPatchRequest,
   ConfirmLocationRequest,
   CreateReportResponse,
   DuplicatesResponse,
@@ -20,6 +26,7 @@ import type {
   ReviewRequest,
   SimulatorSendRequest,
   SimulatorSendResponse,
+  TranscriptRequest,
 } from './types'
 
 export const keys = {
@@ -32,9 +39,10 @@ export const keys = {
   publicReports: (need: NeedCategory[]) => ['public', 'reports', need] as const,
   publicStats: ['public', 'stats'] as const,
   stats: ['stats'] as const,
+  categories: (includeInactive: boolean) => ['categories', includeInactive] as const,
 }
 
-const isExtracting = (s: string) => s === 'pending' || s === 'running'
+const isExtracting = (s: string | null | undefined) => s === 'pending' || s === 'running'
 
 // ---- Health & auth ------------------------------------------------------------------------
 
@@ -95,6 +103,15 @@ export function useSubmitReport() {
   })
 }
 
+/** Sends a recorded call (WAV) through the same path as a real helpline call. */
+export function useSimulatorCall() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (form: FormData) => api.post<SimulatorSendResponse>('/api/simulator/call', form),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['reports'] }),
+  })
+}
+
 export function useSimulatorSend() {
   const qc = useQueryClient()
   return useMutation({
@@ -113,7 +130,11 @@ export function useReports(params: ReportListParams) {
     placeholderData: (prev) => prev,
     // §5.4: rows with pending extraction poll every 2 s; the whole list every 30 s.
     refetchInterval: (query) =>
-      query.state.data?.items.some((r) => isExtracting(r.extraction_status)) ? 2_000 : 30_000,
+      query.state.data?.items.some(
+        (r) => isExtracting(r.extraction_status) || isExtracting(r.transcript_status),
+      )
+        ? 2_000
+        : 30_000,
   })
 }
 
@@ -123,7 +144,10 @@ export function useReport(id: string, opts: { pollExtraction: boolean }) {
     queryFn: () => api.get<Report>(`/api/reports/${id}`),
     // §5.5: poll every 2 s while Gemma is reading; the caller stops after 120 s.
     refetchInterval: (query) =>
-      opts.pollExtraction && query.state.data && isExtracting(query.state.data.extraction.status)
+      opts.pollExtraction &&
+      query.state.data &&
+      (isExtracting(query.state.data.extraction.status) ||
+        isExtracting(query.state.data.call?.transcript_status))
         ? 2_000
         : 30_000,
   })
@@ -160,6 +184,12 @@ export function useRetryExtraction(id: string) {
 export function usePatchFields(id: string) {
   return useReportMutation(id, (fields: Partial<ReviewerFields>) =>
     api.patch<Report>(`/api/reports/${id}/fields`, fields),
+  )
+}
+
+export function usePutTranscript(id: string) {
+  return useReportMutation(id, (body: TranscriptRequest) =>
+    api.put<Report>(`/api/reports/${id}/transcript`, body),
   )
 }
 
@@ -225,4 +255,45 @@ export function useStats() {
     queryFn: () => api.get<ReviewerStats>('/api/stats'),
     refetchInterval: 30_000,
   })
+}
+
+// ---- Help categories ----------------------------------------------------------------------
+
+export function useCategories(includeInactive = false) {
+  return useQuery({
+    queryKey: keys.categories(includeInactive),
+    queryFn: () =>
+      api.get<CategoryListResponse>('/api/categories', {
+        include_inactive: includeInactive ? 'true' : undefined,
+      }),
+    staleTime: 60_000,
+  })
+}
+
+/** Labels, icons and display order for need categories, including organizer-added ones. */
+export function useNeeds() {
+  const { data } = useCategories()
+  const categories: Category[] | undefined = data?.items
+  const meta = useCallback((key: NeedCategory) => needMeta(key, categories), [categories])
+  return { categories: categories ?? [], meta, order: needOrder(categories) }
+}
+
+function useCategoryMutation<V>(fn: (vars: V) => Promise<Category>) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['categories'] }),
+  })
+}
+
+export function useCreateCategory() {
+  return useCategoryMutation((body: CategoryCreateRequest) =>
+    api.post<Category>('/api/categories', body),
+  )
+}
+
+export function usePatchCategory() {
+  return useCategoryMutation(({ key, ...body }: CategoryPatchRequest & { key: string }) =>
+    api.patch<Category>(`/api/categories/${key}`, body),
+  )
 }

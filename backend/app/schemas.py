@@ -1,20 +1,20 @@
 """API request/response models. These mirror BACKEND_TECH_SPEC.md §4 exactly."""
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
-NeedCategory = Literal["food", "clean_water", "shelter", "medicine", "evacuation", "other"]
+# Need categories are managed by the organizer (GET /api/categories); keys are validated at runtime.
+NeedCategory = Annotated[str, StringConstraints(min_length=1, max_length=40, pattern=r"^[a-z0-9_]+$")]
 Urgency = Literal["low", "medium", "high", "unknown"]
 ReportStatus = Literal["pending_review", "approved", "rejected", "flagged", "merged"]
 ExtractionStatus = Literal["pending", "running", "succeeded", "failed"]
 Language = Literal["roman_urdu", "urdu", "english", "pashto", "mixed", "unknown"]
 LocationSource = Literal["submitter_pin", "geocoder_candidate", "reviewer_pin"]
 ReviewAction = Literal["approve", "reject", "flag", "reopen"]
-Channel = Literal["web", "sms", "whatsapp"]
-PriorityLevel = Literal["critical", "high", "medium", "low"]
+Channel = Literal["web", "sms", "whatsapp", "call"]
+TranscriptStatus = Literal["pending", "running", "succeeded", "failed", "manual"]
 
-NEED_CATEGORIES: tuple[str, ...] = ("food", "clean_water", "shelter", "medicine", "evacuation", "other")
 URGENCIES: tuple[str, ...] = ("low", "medium", "high", "unknown")
 
 
@@ -55,7 +55,6 @@ class Extraction(BaseModel):
     quantities: list[QuantityItem]
     place_name: TextField | None
     time_reference: TextField | None
-    urgency_suggestion: Urgency | None
     uncertainties: list[str]
 
 
@@ -99,12 +98,13 @@ class Sender(BaseModel):
     same_sender_count: int
 
 
-class Priority(BaseModel):
-    score: int
-    level: PriorityLevel
-    reasons: list[str]
-    urgency_source: Literal["ai_suggestion", "reviewer"]
-    computed_at: str
+class CallInfo(BaseModel):
+    duration_seconds: float | None
+    has_audio: bool
+    audio_url: str | None
+    transcript_status: TranscriptStatus
+    transcript_model: str | None
+    transcript_error: str | None
 
 
 class DuplicateSummary(BaseModel):
@@ -138,7 +138,7 @@ class Report(BaseModel):
     is_synthetic: bool
     channel: Channel
     sender: Sender | None
-    priority: Priority | None
+    call: CallInfo | None
     source_text: str
     masked_text: str
     has_image: bool
@@ -159,12 +159,12 @@ class ReportListItem(BaseModel):
     created_at: str
     is_synthetic: bool
     channel: Channel
-    priority: Priority | None
     preview: str
     language: Language | None
     needs: list[NeedCategory]
     place: str | None
     extraction_status: ExtractionStatus
+    transcript_status: TranscriptStatus | None
     status: ReportStatus
     urgency: Urgency
     duplicate_count: int
@@ -209,7 +209,7 @@ class ReviewerStats(BaseModel):
     by_need: dict[str, int]
     by_extraction_status: dict[str, int]
     by_channel: dict[str, int]
-    by_priority_level: dict[str, int]
+    by_urgency: dict[str, int]
 
 
 # ---------- requests and small responses ----------
@@ -233,6 +233,9 @@ class HealthResponse(BaseModel):
     status: str
     model: str
     model_available: bool
+    transcriber: str
+    transcriber_available: bool
+    map_provider: Literal["google", "osm"]
     demo_mode: bool
 
 
@@ -285,3 +288,38 @@ class SimulatorResponse(BaseModel):
     report_id: str
     reference: str
     reply: str
+
+
+class CallSimulatorResponse(SimulatorResponse):
+    pass
+
+
+class TranscriptRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=5000)
+
+
+class Category(BaseModel):
+    key: str
+    label: str
+    label_ur: str | None
+    keywords: list[str]
+    builtin: bool
+    active: bool
+    created_at: str
+
+
+class CategoryList(BaseModel):
+    items: list[Category]
+
+
+class CategoryCreate(BaseModel):
+    label: str = Field(min_length=2, max_length=40)
+    label_ur: str | None = Field(default=None, max_length=40)
+    keywords: list[str] | None = Field(default=None, max_length=20)
+
+
+class CategoryPatch(BaseModel):
+    label: str | None = Field(default=None, min_length=2, max_length=40)
+    label_ur: str | None = Field(default=None, max_length=40)
+    keywords: list[str] | None = Field(default=None, max_length=20)
+    active: bool | None = None

@@ -46,10 +46,27 @@ The model sits behind one interface (`app/services/llm/`), so it can be swapped 
 - **Demo:** `POST /api/simulator/send` (demo mode only) goes through exactly the same code as real messages.
 - **Real channels (optional):** set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and `PUBLIC_BASE_URL` (a tunnel such as `cloudflared tunnel --url http://localhost:8000`), then point Twilio's incoming-message webhooks at `/api/inbound/sms` and `/api/inbound/whatsapp`. Every request's Twilio signature is verified. See spec §16.4.
 
+## Helpline calls and transcription
+
+- **Real calls (optional):** point a Twilio number's voice webhook at `/api/inbound/voice`. Callers hear a recording notice, leave a message after the beep, and the recording arrives at `/api/inbound/voice/recording`.
+- **Demo:** the simulator's Call tab records from the microphone (or takes an audio file) and posts it to `/api/simulator/call`.
+- **Transcription with Gemma 4:** `pip install -e ".[audio]"`, then `TRANSCRIBER_BACKEND=gemma`. Gemma 4 E2B/E4B transcribe speech through Hugging Face Transformers (not Ollama), 30 seconds at a time, so calls are split into 30-second chunks. The first run downloads several GB.
+- **Without a speech model:** recordings are kept, the report shows "Needs transcript", and the reviewer listens and types it. The AI then reads the text as usual.
+
+## Help categories
+
+Six built-ins are created automatically. The organizer adds more from the dashboard (name, Urdu name, keywords people use); the AI only uses active categories. API: `GET/POST /api/categories`, `PATCH /api/categories/{key}`.
+
+## Maps and place search
+
+- `GOOGLE_MAPS_API_KEY` (server) switches place search to Google's Geocoding API; the frontend's `VITE_GOOGLE_MAPS_API_KEY` (browser key) switches the basemap to Google map tiles. Without keys everything uses OpenStreetMap.
+- If a full place phrase finds nothing, broader versions are tried: "Lalkurti, Cantt, Rawalpindi" → "Cantt, Rawalpindi" → "Rawalpindi".
+- Reviewers can always click the map, drag the pin, or type coordinates / paste a Google Maps link.
+
 ## Tests, lint and evaluation
 
 ```bash
-pytest                       # 62 tests; no GPU, model or network needed
+pytest                       # 84 tests; no GPU, model or network needed
 ruff check app tests ../eval
 python ../eval/run_eval.py   # writes eval/results.md  (add --geocode to test map search)
 ```

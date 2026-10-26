@@ -1,28 +1,24 @@
-import { AlertTriangle, ArrowRight, Map as MapIcon } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Gauge, Map as MapIcon } from 'lucide-react'
 import { Link } from 'react-router'
-import { usePublicStats, useStats } from '../api/hooks'
-import type { ReportStatus } from '../api/types'
+import { useNeeds, usePublicStats, useStats } from '../api/hooks'
+import type { Channel, ReportStatus, Urgency } from '../api/types'
 import { BarList } from '../components/BarList'
 import { NeedChip } from '../components/badges'
+import { CategoryManager } from '../components/CategoryManager'
 import { ErrorState, Skeleton } from '../components/ui'
-import {
-  CHANNEL_ORDER,
-  CHANNELS,
-  NEED_ORDER,
-  NEEDS,
-  PRIORITY,
-  PRIORITY_ORDER,
-  STATUS,
-} from '../lib/meta'
+import { CHANNEL_ORDER, CHANNELS, STATUS, URGENCY_LABEL } from '../lib/meta'
 
 const KPI_STATUSES: ReportStatus[] = ['pending_review', 'flagged', 'approved', 'rejected']
 
-// Channel bars reuse the first three hues of the validated categorical sequence (tokens.css).
-const CHANNEL_COLOR = {
+// Channel bars reuse hues of the validated categorical sequence (tokens.css).
+const CHANNEL_COLOR: Record<Channel, string> = {
   web: 'var(--need-clean_water)',
   sms: 'var(--need-evacuation)',
   whatsapp: 'var(--need-shelter)',
+  call: 'var(--need-food)',
 }
+
+const URGENCY_TILES: Urgency[] = ['high', 'medium', 'low', 'unknown']
 
 function Tile({
   label,
@@ -71,6 +67,7 @@ const TAB_FOR: Partial<Record<ReportStatus, string>> = {
 export function Dashboard() {
   const stats = useStats()
   const pub = usePublicStats()
+  const needs = useNeeds()
 
   if (stats.isError)
     return (
@@ -133,27 +130,25 @@ export function Dashboard() {
         </div>
       </section>
 
-      <section aria-labelledby="prio-h">
-        <h2 id="prio-h" className="eyebrow mb-2">
-          Priority (pending and flagged)
+      <section aria-labelledby="urg-h">
+        <h2 id="urg-h" className="eyebrow mb-2">
+          Urgency set by reviewers
         </h2>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {PRIORITY_ORDER.map((lvl) => {
-            const m = PRIORITY[lvl]
-            const Icon = m.icon
-            return s ? (
+          {URGENCY_TILES.map((u) =>
+            s ? (
               <Tile
-                key={lvl}
-                label={m.label}
-                value={s.by_priority_level[lvl] ?? 0}
-                color={m.color}
-                icon={<Icon size={16} aria-hidden="true" />}
-                to={`/review?priority_level=${lvl}`}
+                key={u}
+                label={u === 'unknown' ? 'Not set yet' : URGENCY_LABEL[u]}
+                value={s.by_urgency[u] ?? 0}
+                color="var(--primary)"
+                icon={<Gauge size={16} aria-hidden="true" />}
+                to={`/review?tab=all&urgency=${u}`}
               />
             ) : (
-              <Skeleton key={lvl} className="h-24" />
-            )
-          })}
+              <Skeleton key={u} className="h-24" />
+            ),
+          )}
         </div>
       </section>
 
@@ -194,11 +189,11 @@ export function Dashboard() {
           ) : pub.data ? (
             <BarList
               label="Approved reports by need"
-              items={NEED_ORDER.map((n) => ({
+              items={needs.order.map((n) => ({
                 key: n,
                 label: <NeedChip need={n} />,
                 value: pub.data.by_need[n] ?? 0,
-                color: NEEDS[n].color,
+                color: needs.meta(n).color,
               }))}
             />
           ) : (
@@ -206,6 +201,8 @@ export function Dashboard() {
           )}
         </section>
       </div>
+
+      <CategoryManager />
 
       <section aria-labelledby="areas-h" className="card overflow-hidden">
         <h2 id="areas-h" className="px-5 pt-5 pb-3 font-semibold">

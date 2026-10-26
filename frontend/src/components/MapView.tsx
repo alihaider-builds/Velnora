@@ -4,6 +4,12 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { MapPinOff } from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { BASEMAP_STYLE, PAKISTAN_CENTER, PAKISTAN_ZOOM } from '../lib/config'
+import {
+  attachGoogleAttribution,
+  GOOGLE_MAPS_KEY,
+  googleSession,
+  googleStyle,
+} from '../lib/googleMaps'
 
 // MapLibre resolves its worker next to its own module, which Vite's dependency pre-bundling
 // moves; point it at the worker file explicitly so maps load in dev and production builds.
@@ -21,7 +27,9 @@ export function cssVar(value: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(m[1]).trim() || '#888'
 }
 
-/** Creates a MapLibre map once; `failed` is true when WebGL is unavailable. */
+/** Creates a MapLibre map once; `failed` is true when WebGL is unavailable. The basemap is
+ * Google Maps when VITE_GOOGLE_MAPS_API_KEY is set (falling back to OpenStreetMap if Google
+ * refuses the key), otherwise OpenStreetMap. */
 // eslint-disable-next-line react-refresh/only-export-components
 export function useMapLibre(
   container: RefObject<HTMLDivElement | null>,
@@ -32,30 +40,48 @@ export function useMapLibre(
   const initial = useRef({ center, zoom, compactAttribution })
 
   useEffect(() => {
-    if (!container.current) return
+    const el = container.current
+    if (!el) return
     const dark = window.matchMedia?.('(prefers-color-scheme: dark)').matches
-    let instance: MLMap
-    try {
-      instance = new maplibregl.Map({
-        container: container.current,
-        style: dark ? BASEMAP_STYLE.dark : BASEMAP_STYLE.light,
-        center: initial.current.center,
-        zoom: initial.current.zoom,
-        attributionControl: { compact: initial.current.compactAttribution },
-        cooperativeGestures: false,
-      })
-    } catch {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init failure
-      setFailed(true)
-      return
+    let instance: MLMap | null = null
+    let detach: (() => void) | undefined
+    let cancelled = false
+
+    const create = (session: string | null) => {
+      if (cancelled) return
+      try {
+        instance = new maplibregl.Map({
+          container: el,
+          style: session ? googleStyle(session) : dark ? BASEMAP_STYLE.dark : BASEMAP_STYLE.light,
+          center: initial.current.center,
+          zoom: initial.current.zoom,
+          attributionControl: session ? false : { compact: initial.current.compactAttribution },
+          cooperativeGestures: false,
+        })
+      } catch {
+        setFailed(true)
+        return
+      }
+      instance.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
+      if (session) detach = attachGoogleAttribution(instance, session)
+      // Expose the map immediately so clicks and markers work before tiles finish loading;
+      // code that adds sources/layers waits for the style itself (see whenStyleReady).
+      setMap(instance)
     }
-    instance.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
-    // Expose the map immediately so clicks and markers work before tiles finish loading;
-    // code that adds sources/layers waits for the style itself (see whenStyleReady).
-    setMap(instance)
+
+    if (GOOGLE_MAPS_KEY) {
+      googleSession().then(create, (err) => {
+        console.warn('Google Maps unavailable, using OpenStreetMap:', err)
+        create(null)
+      })
+    } else {
+      create(null)
+    }
     return () => {
+      cancelled = true
+      detach?.()
       setMap(null)
-      instance.remove()
+      instance?.remove()
     }
   }, [container])
 

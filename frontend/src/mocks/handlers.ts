@@ -12,6 +12,9 @@ import {
   type PathParams,
 } from 'msw'
 import type {
+  Category,
+  CategoryCreateRequest,
+  CategoryPatchRequest,
   ConfirmLocationRequest,
   MergeRequest,
   NeedCategory,
@@ -20,9 +23,9 @@ import type {
   ReviewerFields,
   ReviewRequest,
   SimulatorSendRequest,
+  TranscriptRequest,
 } from '../api/types'
 import {
-  computePriority,
   effectiveNeeds,
   emptyExtraction,
   fakeExtract,
@@ -103,10 +106,9 @@ function senderOf(id: string) {
   return record(id)?.from ?? null
 }
 
-/** Recomputes derived fields the backend computes on read (§17 priority, duplicates, sender). */
+/** Recomputes derived fields the backend computes on read (duplicates, sender). */
 function refresh(rec: MockRecord): Report {
   const r = rec.report
-  r.priority = computePriority(r)
   r.duplicate_count = findDuplicates(
     r,
     db.map((x) => x.report),
@@ -178,7 +180,7 @@ function createReport(input: {
     is_synthetic: DEMO_MODE,
     channel: input.channel,
     sender: input.from ? { masked: maskSender(input.from), same_sender_count: 0 } : null,
-    priority: null,
+    call: null,
     source_text: input.text,
     masked_text: maskText(input.text),
     has_image: input.hasImage,
@@ -221,6 +223,9 @@ export const handlers = [
       status: 'ok',
       model: MOCK_MODEL,
       model_available: true,
+      transcriber: 'none',
+      transcriber_available: false,
+      map_provider: 'osm',
       demo_mode: DEMO_MODE,
     })
   }),
@@ -325,11 +330,11 @@ export const handlers = [
       const url = new URL(request.url)
       const statuses = url.searchParams.getAll('status')
       const channels = url.searchParams.getAll('channel')
-      const levels = url.searchParams.getAll('priority_level')
+      const urgencies = url.searchParams.getAll('urgency')
       const need = url.searchParams.get('need') as NeedCategory | null
       const extraction = url.searchParams.get('extraction_status')
       const q = url.searchParams.get('q')?.toLowerCase().trim()
-      const sort = url.searchParams.get('sort') ?? 'priority'
+      const sort = url.searchParams.get('sort') ?? 'newest'
       const page = Math.max(1, Number(url.searchParams.get('page') ?? 1))
       const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get('page_size') ?? 25)))
 
@@ -340,19 +345,15 @@ export const handlers = [
           (r) =>
             (statuses.length === 0 || statuses.includes(r.status)) &&
             (channels.length === 0 || channels.includes(r.channel)) &&
-            (levels.length === 0 || (r.priority !== null && levels.includes(r.priority.level))) &&
+            (urgencies.length === 0 || urgencies.includes(r.urgency)) &&
             (!need || effectiveNeeds(r).includes(need)) &&
             (!extraction || r.extraction.status === extraction) &&
             (!q || r.masked_text.toLowerCase().includes(q)),
         )
 
       const age = (r: Report) => new Date(r.created_at).getTime()
-      rows = rows.sort((a, b) => {
-        if (sort === 'newest') return age(b) - age(a)
-        if (sort === 'oldest') return age(a) - age(b)
-        if (!a.priority || !b.priority) return a.priority ? -1 : b.priority ? 1 : age(a) - age(b)
-        return b.priority.score - a.priority.score || age(a) - age(b)
-      })
+      // Time order only — the reviewer decides what matters most.
+      rows = rows.sort((a, b) => (sort === 'oldest' ? age(a) - age(b) : age(b) - age(a)))
 
       const items = rows.slice((page - 1) * pageSize, page * pageSize).map(toListItem)
       return HttpResponse.json({ items, total: rows.length, page, page_size: pageSize })
@@ -515,7 +516,7 @@ export const handlers = [
       const r = rec.report
       const allowed: Record<
         ReportStatus,
-        Partial<Record<ReviewRequest['action'], ReportStatus>>
+        Partial<Record<NonNullable<ReviewRequest['action']>, ReportStatus>>
       > = {
         pending_review: { approve: 'approved', reject: 'rejected', flag: 'flagged' },
         flagged: { approve: 'approved', reject: 'rejected' },
@@ -523,8 +524,12 @@ export const handlers = [
         rejected: { reopen: 'pending_review' },
         merged: {},
       }
-      const to = allowed[r.status][body.action]
-      if (!to)
+      if (!body.action && !body.urgency)
+        return error(400, 'VALIDATION_ERROR', 'Give an action, an urgency, or both.')
+      if (r.status === 'merged')
+        return error(409, 'INVALID_TRANSITION', "Merged reports can't be reviewed.")
+      const to = body.action ? allowed[r.status][body.action] : undefined
+      if (body.action && !to)
         return error(
           409,
           'INVALID_TRANSITION',
@@ -537,7 +542,7 @@ export const handlers = [
         audit(r, 'set_urgency', `Urgency: ${body.urgency}`)
         r.urgency = body.urgency
       }
-      audit(r, body.action, body.note?.trim() || null, to)
+      if (body.action && to) audit(r, body.action, body.note?.trim() || null, to)
       return HttpResponse.json(refresh(rec))
     }),
   ),
@@ -582,8 +587,139 @@ export const handlers = [
         by_need: count(reports.filter((r) => r.status === 'approved').flatMap(effectiveNeeds)),
         by_extraction_status: count(reports.map((r) => r.extraction.status)),
         by_channel: count(reports.map((r) => r.channel)),
-        by_priority_level: count(reports.flatMap((r) => (r.priority ? [r.priority.level] : []))),
+        by_urgency: count(reports.map((r) => r.urgency)),
       })
+    }),
+  ),
+]
+
+// ---- Help categories (in memory) ----------------------------------------------------------
+
+const categories: Category[] = [
+  ['food', 'Food', 'خوراک'],
+  ['clean_water', 'Clean water', 'صاف پانی'],
+  ['shelter', 'Shelter', 'پناہ'],
+  ['medicine', 'Medicine', 'دوا'],
+  ['evacuation', 'Evacuation', 'انخلا'],
+  ['other', 'Other', 'دیگر'],
+].map(([key, label, label_ur]) => ({
+  key,
+  label,
+  label_ur,
+  keywords: [],
+  builtin: true,
+  active: true,
+  created_at: new Date().toISOString(),
+}))
+
+function categoryKey(label: string): string {
+  const base =
+    label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_|_$/g, '')
+      .slice(0, 28) || 'cat'
+  let key = base
+  for (let n = 2; categories.some((c) => c.key === key); n++) key = `${base}_${n}`
+  return key
+}
+
+export const categoryHandlers = [
+  http.get('/api/categories', ({ request }) => {
+    const all = new URL(request.url).searchParams.get('include_inactive') === 'true'
+    return HttpResponse.json({ items: categories.filter((c) => all || c.active) })
+  }),
+  http.post(
+    '/api/categories',
+    reviewerOnly(async ({ request }) => {
+      const body = (await request.json()) as CategoryCreateRequest
+      const label = body.label?.trim() ?? ''
+      if (label.length < 2) return error(400, 'VALIDATION_ERROR', 'Name is too short.')
+      if (categories.some((c) => c.label.toLowerCase() === label.toLowerCase()))
+        return error(409, 'CATEGORY_EXISTS', 'A category with this name already exists.')
+      const cat: Category = {
+        key: categoryKey(label),
+        label,
+        label_ur: body.label_ur?.trim() || null,
+        keywords: body.keywords ?? [],
+        builtin: false,
+        active: true,
+        created_at: new Date().toISOString(),
+      }
+      categories.push(cat)
+      return HttpResponse.json(cat, { status: 201 })
+    }),
+  ),
+  http.patch(
+    '/api/categories/:key',
+    reviewerOnly(async ({ params, request }) => {
+      const cat = categories.find((c) => c.key === params.key)
+      if (!cat) return error(404, 'NOT_FOUND', 'Category not found.')
+      const body = (await request.json()) as CategoryPatchRequest
+      if (body.active === false && cat.key === 'other')
+        return error(409, 'CATEGORY_LOCKED', "The 'Other' category can't be turned off.")
+      if (body.label) cat.label = body.label.trim()
+      if (body.label_ur !== undefined) cat.label_ur = body.label_ur?.trim() || null
+      if (body.keywords) cat.keywords = body.keywords
+      if (body.active !== undefined) cat.active = body.active
+      return HttpResponse.json(cat)
+    }),
+  ),
+
+  // Calls (§16): the mock has no speech model; a typed stand-in or the reviewer supplies text.
+  http.post('/api/simulator/call', async ({ request }) => {
+    await delay(700)
+    if (!DEMO_MODE) return error(404, 'NOT_FOUND', 'Simulator is only available in demo mode.')
+    const form = await request.formData()
+    const hint = String(form.get('transcript_hint') ?? '').trim()
+    const rec = createReport({
+      text: hint,
+      channel: 'call',
+      from: String(form.get('from') ?? ''),
+      placeText: null,
+      point: null,
+      hasImage: false,
+    })
+    const r = rec.report
+    r.call = {
+      duration_seconds: 12,
+      has_audio: false,
+      audio_url: null,
+      transcript_status: hint ? 'succeeded' : 'failed',
+      transcript_model: hint ? 'typed-demo-transcript' : null,
+      transcript_error: hint ? null : 'No speech model is configured. Type the transcript.',
+    }
+    if (!hint) {
+      r.extraction = emptyExtraction('failed', 0, 'Waiting for a transcript.')
+      rec.pendingPolls = 0
+    }
+    const ref = r.reference
+    const reply =
+      `Shukriya! Aap ki call record ho gayi hai (${ref}). Ek volunteer isay sun kar review karega.\n` +
+      `Thank you, call ${ref} recorded. In a life-threatening emergency, call 1122.`
+    return HttpResponse.json({ report_id: r.id, reference: ref, reply })
+  }),
+  http.put(
+    '/api/reports/:id/transcript',
+    reviewerOnly(async ({ params, request }) => {
+      const rec = record(String(params.id))
+      if (!rec) return error(404, 'NOT_FOUND', 'Report not found.')
+      const r = rec.report
+      if (r.channel !== 'call' || !r.call)
+        return error(409, 'NOT_A_CALL', 'Only call reports have a transcript.')
+      const body = (await request.json()) as TranscriptRequest
+      r.source_text = body.text.trim()
+      r.masked_text = maskText(r.source_text)
+      r.call = {
+        ...r.call,
+        transcript_status: 'manual',
+        transcript_model: 'reviewer',
+        transcript_error: null,
+      }
+      r.extraction = emptyExtraction('pending')
+      rec.pendingPolls = 3
+      audit(r, 'edit_transcript', null)
+      return HttpResponse.json(refresh(rec))
     }),
   ),
 ]

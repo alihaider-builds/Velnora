@@ -72,7 +72,6 @@ const seeds: Seed[] = [
       quantities: [{ value: 5, label: 'children', evidence: evidence(T1, '5 bachay') }],
       place_name: { text: 'Buner', evidence: evidence(T1, 'Buner') },
       time_reference: null,
-      urgency_suggestion: 'high',
       uncertainties: ['Exact village within Buner not stated.'],
     }),
     location: {
@@ -101,7 +100,6 @@ const seeds: Seed[] = [
       quantities: [{ value: 5, label: 'children', evidence: evidence(T2, '5 bachhay') }],
       place_name: { text: 'Pir Baba', evidence: evidence(T2, 'Pir Baba') },
       time_reference: null,
-      urgency_suggestion: 'high',
       uncertainties: [],
     }),
     location: {
@@ -125,7 +123,6 @@ const seeds: Seed[] = [
       quantities: [{ value: 20, label: 'families', evidence: evidence(T3, 'بیس خاندان') }],
       place_name: { text: 'سوات', evidence: evidence(T3, 'سوات') },
       time_reference: null,
-      urgency_suggestion: 'medium',
       uncertainties: ['Village name not stated; only "near Swat".'],
     }),
     location: { submitted_text: 'سوات' },
@@ -147,7 +144,6 @@ const seeds: Seed[] = [
         text: 'on rooftops now',
         evidence: { phrase: 'chhat par abhi', start: null, end: null, matched: false },
       },
-      urgency_suggestion: 'high',
       uncertainties: ['Evidence not found for time_reference', 'Number of people not stated.'],
     }),
   },
@@ -182,7 +178,6 @@ const seeds: Seed[] = [
       quantities: [],
       place_name: { text: 'Mardan', evidence: evidence(T7, 'Mardan') },
       time_reference: null,
-      urgency_suggestion: 'medium',
       uncertainties: ['Message contains instructions addressed to the system; they were ignored.'],
     }),
   },
@@ -202,7 +197,6 @@ const seeds: Seed[] = [
       quantities: [{ value: 6, label: 'family members', evidence: evidence(T8, 'Family of 6') }],
       place_name: { text: 'Kalam bridge', evidence: evidence(T8, 'Kalam bridge') },
       time_reference: { text: 'since last night', evidence: evidence(T8, 'since last night') },
-      urgency_suggestion: 'high',
       uncertainties: [],
     }),
     audit: [
@@ -229,7 +223,6 @@ const seeds: Seed[] = [
       quantities: [],
       place_name: { text: 'Charsadda', evidence: evidence(T9, 'Charsadda') },
       time_reference: null,
-      urgency_suggestion: 'low',
       uncertainties: ['No need stated.'],
     }),
   },
@@ -321,7 +314,7 @@ function build(s: Seed): Report {
     is_synthetic: true,
     channel: s.channel,
     sender: s.from ? { masked: maskSender(s.from), same_sender_count: 0 } : null,
-    priority: null,
+    call: null,
     source_text: s.text,
     masked_text: maskText(s.text),
     has_image: s.hasImage ?? false,
@@ -378,7 +371,6 @@ export function seedRecords(): MockRecord[] {
         quantities: [],
         place_name: null,
         time_reference: null,
-        urgency_suggestion: 'medium',
         uncertainties: [],
       }),
       location: {
@@ -414,7 +406,6 @@ export function seedRecords(): MockRecord[] {
       quantities: [],
       place_name: null,
       time_reference: null,
-      urgency_suggestion: 'low',
       uncertainties: ['No need stated.'],
     }),
     audit: [
@@ -444,7 +435,6 @@ export function seedRecords(): MockRecord[] {
       quantities: [],
       place_name: { text: 'Pir Baba', evidence: evidence(mergedText, 'Pir Baba') },
       time_reference: null,
-      urgency_suggestion: 'high',
       uncertainties: [],
     }),
     audit: [

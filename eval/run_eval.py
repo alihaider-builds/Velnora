@@ -24,6 +24,7 @@ sys.path.insert(0, str(ROOT / "backend"))
 from app.config import Settings  # noqa: E402
 from app.db import make_engine  # noqa: E402
 from app.services import privacy  # noqa: E402
+from app.services.categories import BUILTINS, ensure_builtins  # noqa: E402
 from app.services.channels import create_report  # noqa: E402
 from app.services.duplicates import DupView, haversine_km, score_pair  # noqa: E402
 from app.services.extraction import extract_fields  # noqa: E402
@@ -33,6 +34,7 @@ from app.services.normalize import normalize, normalize_for_compare  # noqa: E40
 from app.timeutil import utcnow  # noqa: E402
 
 SAMPLES = ROOT / "data" / "samples"
+CATEGORIES = [{**c, "keywords": []} for c in BUILTINS]
 GEOCODE_TOLERANCE_KM = 15.0
 
 
@@ -60,7 +62,7 @@ async def main(do_geocode: bool) -> None:
 
     results: dict[str, dict] = {}
     for s in samples:
-        res = await extract_fields(s["text"], s.get("place_text"), llm)
+        res = await extract_fields(s["text"], s.get("place_text"), llm, CATEGORIES)
         results[s["id"]] = {"status": res.status, "attempts": res.attempts, "out": res.output}
         print(f"  {s['id']}: {res.status}")
 
@@ -143,6 +145,7 @@ async def main(do_geocode: bool) -> None:
                                 llm_backend=settings.llm_backend, ollama_url=settings.ollama_url,
                                 ollama_model=settings.ollama_model)
         engine = make_engine(tmp_settings.resolve(tmp_settings.database_path))
+        ensure_builtins(engine)
         from sqlalchemy import select
 
         from app.db import reports

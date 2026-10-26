@@ -1,5 +1,17 @@
 # ReliefLens — Product Requirements Document (PRD)
 
+> **v2 changes (26 Oct) — these override anything below:**
+> - **No AI ranking.** The priority score and the AI urgency suggestion are removed. The review queue is
+>   ordered by time (newest first, oldest first on request); the reviewer sets urgency and can filter by it.
+> - **Helpline calls.** Calls are recorded (with a recording notice), transcribed by Gemma 4 when installed,
+>   or typed by the reviewer after listening; then extracted like any message. The simulator has a Call tab.
+> - **Help categories** are managed by the organizer from the dashboard (name, Urdu name, keywords); the AI
+>   uses the active list.
+> - **Location:** better place extraction (e.g. "Lalkurti, Cantt, Rawalpindi"), broader-query map search,
+>   Google Maps tiles + Google geocoding when keys are set (OpenStreetMap otherwise), and manual entry of
+>   coordinates or a pasted Google Maps link.
+> - The API contract is `BACKEND_TECH_SPEC.md` §4 (updated); the code in `backend/` and `frontend/` matches it.
+
 | | |
 |---|---|
 | **Product** | ReliefLens — Multilingual Disaster Report Intelligence |
@@ -19,9 +31,9 @@ During floods, reports about urgent needs arrive as informal messages in Roman U
 ReliefLens turns each report into a structured record that a human reviews:
 
 1. Anyone sends a report through **SMS, WhatsApp or the web form** (text, optional image, place name or map pin).
-2. Gemma 4 suggests the needs, quantities, place, time and urgency, **citing the exact phrase each one came from**.
-3. The backend validates the output, suggests a location and possible duplicates, and ranks the report in a **priority list** based on the AI's urgency suggestion and how long the report has been waiting.
-4. A reviewer works down the priority list, checks the evidence, confirms the location and urgency, and approves, rejects, flags or merges.
+2. Gemma 4 suggests the needs, quantities, place and time, **citing the exact phrase each one came from**. Calls are transcribed first.
+3. The backend validates the output and suggests a location and possible duplicates. Reports wait in a **time-ordered queue**; the AI does not rank them.
+4. A reviewer checks the evidence, decides the urgency, confirms the location, and approves, rejects, flags or merges.
 5. Only approved, privacy-filtered records appear on the public map.
 
 **Principle: AI suggests; humans decide.**
@@ -39,14 +51,13 @@ ReliefLens turns each report into a structured record that a human reviews:
 | G4 | Protect people's privacy | Public views never show free text, images, names or phone numbers |
 | G5 | Be demonstrable end to end | A judge completes the success scenario (§9) without editing the database |
 | G6 | Meet people where they already message | Reports arrive by SMS and WhatsApp as well as the web form, into one inbox |
-| G7 | Show the most urgent reports first | Queue ordered by a transparent priority score; every score explains itself |
+| G7 | Keep humans in charge of priority | Queue ordered by arrival time; urgency set only by reviewers |
 
 ### Non-goals (out of scope)
 - Predicting floods or forecasting.
 - Proving that a report or image is genuine.
 - Deciding who receives aid, dispatching aid or emergency services.
 - A native mobile app (the web UI must work on a phone browser).
-- Phone calls and voice-to-text (out of scope for this build).
 - Automatically alerting police, rescue or other services. The priority list helps a human decide; it never sends anything by itself.
 - Running a real public helpline number for the demo. SMS and WhatsApp are demonstrated with a built-in simulator, plus an optional Twilio test number.
 - Real emergency data in the demo (synthetic data only).
@@ -102,7 +113,10 @@ Priority: **P0** = required for the demo · **P1** = strongly wanted · **P2** =
 | ID | Story | Acceptance criteria | Pri |
 |---|---|---|---|
 | US-12 | As a reviewer, I approve, reject or flag a report and set urgency | Approve requires a confirmed location; urgency only changes by reviewer action | P0 |
-| US-24 | As a reviewer, I work from a priority list | Queue sorted by priority score by default; each report shows its level (Critical / High / Medium / Low) and the reasons (e.g. "AI suggests high urgency", "Waiting 3 h"); the score rises the longer a report waits; reviewer-set urgency replaces the AI suggestion in the score | P0 |
+| US-24 | As a reviewer, I see reports in order of arrival and decide urgency myself | Queue sorted newest first (oldest first on request); filter by my urgency; no AI ranking | P0 |
+| US-25 | As a caller, I can phone the helpline and leave a message | Recording notice played; message recorded; transcribed (Gemma 4) or typed by the reviewer after listening; then extracted | P0 (simulator) · P1 (real number) |
+| US-26 | As the organizer, I can add help categories | Dashboard form: name, Urdu name, keywords; turn categories on/off; AI uses active ones | P0 |
+| US-27 | As a reviewer, I can enter a location exactly | Type coordinates or paste a Google Maps link, besides map search, click and drag | P0 |
 | US-13 | As a reviewer, I see a history of every change | Audit trail shows time, reviewer and action | P1 |
 | US-14 | As a reviewer, I sign in before seeing any report | Reviewer pages and APIs require sign-in | P0 |
 | US-15 | As a reviewer, I can delete a test report and its image | Deletion removes the record and the file | P1 |
@@ -140,8 +154,11 @@ Detailed behaviour lives in the module specs; numbering is shared.
 | FR-14 | Demo/synthetic labelling throughout | A + B |
 | FR-15 | Seed data and evaluation script | A |
 | FR-16 | Inbound SMS and WhatsApp webhooks (Twilio format), channel tagging, automatic reply | A |
-| FR-17 | Priority score from AI urgency suggestion, need type and waiting time, with reasons | A |
-| FR-18 | Channel badges, priority list and in-app SMS/WhatsApp simulator | B |
+| FR-17 | Time-ordered queue with urgency filter (priority score removed in v2) | A |
+| FR-19 | Call recording, Gemma 4 transcription (30 s chunks), reviewer transcript editing | A + B |
+| FR-20 | Organizer-managed help categories used by extraction | A + B |
+| FR-21 | Google geocoding/map tiles when keys are set; broader-query fallback; manual coordinates | A + B |
+| FR-18 | Channel badges, time-ordered queue and in-app SMS/WhatsApp/Call simulator | B |
 
 **A** = Module A (backend, AI, data). **B** = Module B (frontend, UI/UX).
 
@@ -219,7 +236,7 @@ A judge, following the README:
 
 1. Starts the app with the documented setup.
 2. Opens the simulator and sends a **WhatsApp** message: *"Buner mein pani ghar mein aa gaya, 5 bachay hain, dawai aur saaf pani chahiye."* The simulated phone receives an automatic reply with a reference number.
-3. Signs in as the reviewer and sees the report near the top of the priority list, tagged "WhatsApp", with its priority reasons.
+3. Signs in as the reviewer and sees the report at the top of the queue (newest first), tagged "WhatsApp".
 4. Sees suggested needs (medicine, clean water), quantity (5 children) and place (Buner), and clicks each to highlight its phrase.
 5. Confirms a suggested location or drops a pin.
 6. Sends a similar report by **SMS** with different spelling and sees it suggested as a duplicate, with reasons.
@@ -258,7 +275,7 @@ Targets are goals for a small development set, not proof of real-world readiness
 | Dataset license unverified | Disqualification risk | Do not ship the overlay unless verified (P2 only) | A |
 | Running out of time | Unfinished demo | Build priority order (§8); freeze at C5 | Both |
 | Twilio account, number or sandbox not ready | No real SMS/WhatsApp | The simulator uses the same inbound code path, so the demo works without Twilio; real channels are P1 | A |
-| Priority score ranks a real emergency low | Harm in real use | Score is transparent, rises with waiting time, and the reviewer can always override urgency | A + B |
+| Gemma 4 audio is heavy or unavailable | No automatic transcripts | Recordings are kept; reviewer types the transcript; transcription is optional | A |
 
 ---
 

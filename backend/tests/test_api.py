@@ -31,7 +31,8 @@ def _jpeg_with_gps() -> bytes:
 
 def test_health(client):
     body = client.get("/api/health").json()
-    assert body == {"status": "ok", "model": "fake-heuristic", "model_available": True, "demo_mode": True}
+    assert body == {"status": "ok", "model": "fake-heuristic", "model_available": True, "transcriber": "none",
+                    "transcriber_available": False, "map_provider": "osm", "demo_mode": True}
 
 
 def test_reviewer_routes_require_sign_in(client):
@@ -75,7 +76,8 @@ def test_web_submit_full_flow_to_public_map(reviewer):
     assert ext["status"] == "succeeded"
     assert {n["category"] for n in ext["needs"]} == {"medicine", "clean_water"}
     assert all(n["evidence"]["matched"] for n in ext["needs"])
-    assert report["priority"]["score"] == 70 and report["urgency"] == "unknown"
+    assert "priority" not in report and report["urgency"] == "unknown" and report["call"] is None
+    assert "urgency_suggestion" not in ext
 
     # approve requires a confirmed location
     resp = reviewer.post(f"/api/reports/{rid}/review", json={"action": "approve"})
@@ -83,7 +85,7 @@ def test_web_submit_full_flow_to_public_map(reviewer):
     confirm_location(reviewer, rid, label="Pir Baba, Buner District, Khyber Pakhtunkhwa, Pakistan")
     resp = reviewer.post(f"/api/reports/{rid}/review", json={"action": "approve", "urgency": "high", "note": "ok"})
     assert resp.status_code == 200
-    assert resp.json()["status"] == "approved" and resp.json()["priority"] is None
+    assert resp.json()["status"] == "approved" and resp.json()["urgency"] == "high"
 
     public = reviewer.get("/api/public/reports").json()
     assert public["total"] == 1
@@ -112,13 +114,14 @@ def test_status_transitions(reviewer):
     assert reviewer.post(f"/api/reports/{rid}/review", json={"action": "reopen"}).json()["status"] == "pending_review"
 
 
-def test_urgency_only_update_changes_priority(reviewer):
+def test_urgency_only_update(reviewer):
     rid = send(reviewer)
     resp = reviewer.post(f"/api/reports/{rid}/review", json={"urgency": "low"})
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "pending_review" and body["urgency"] == "low"
-    assert body["priority"]["urgency_source"] == "reviewer" and body["priority"]["score"] == 30
+    assert reviewer.get("/api/reports", params={"urgency": "low"}).json()["total"] == 1
+    assert reviewer.get("/api/reports", params={"urgency": "high"}).json()["total"] == 0
     assert reviewer.post(f"/api/reports/{rid}/review", json={}).status_code == 400
 
 
@@ -133,7 +136,7 @@ def test_merge_rules_and_duplicates(reviewer):
 
     assert reviewer.post(f"/api/reports/{b}/merge", json={"target_id": b}).status_code == 409
     merged = reviewer.post(f"/api/reports/{b}/merge", json={"target_id": a, "note": "same family"}).json()
-    assert merged["status"] == "merged" and merged["merged_into"] == a and merged["priority"] is None
+    assert merged["status"] == "merged" and merged["merged_into"] == a
     assert reviewer.post(f"/api/reports/{a}/merge", json={"target_id": b}).status_code == 409
     assert reviewer.post(f"/api/reports/{b}/review", json={"action": "approve"}).status_code == 409
     assert reviewer.get(f"/api/reports/{a}/duplicates").json()["candidates"] == []
@@ -151,19 +154,25 @@ def test_edit_fields_keeps_ai_output(reviewer):
     assert resp.status_code == 400
 
 
-def test_list_sorting_and_filters(reviewer):
-    low = send(reviewer, body="Larkana mein sab theek hai, bas bijli nahi hai", sender="+923000000099")
-    high = send(reviewer, body="Kalam mein 30 log phanse hain, kashti bhejein", sender="+923000000098")
+def test_list_is_time_ordered_newest_first(reviewer, settings):
+    from sqlalchemy import update
+
+    from app.db import reports
+
+    first = send(reviewer, body="Kalam mein 30 log phanse hain, kashti bhejein", sender="+923000000098")
+    second = send(reviewer, body="Larkana mein sab theek hai, bas bijli nahi hai", sender="+923000000099")
+    engine = reviewer.app.state.engine
+    with engine.begin() as conn:  # make the order unambiguous
+        conn.execute(update(reports).where(reports.c.id == first).values(created_at="2026-10-26T08:00:00Z"))
+        conn.execute(update(reports).where(reports.c.id == second).values(created_at="2026-10-26T09:00:00Z"))
     items = reviewer.get("/api/reports").json()["items"]
-    assert [i["id"] for i in items] == [high, low]
-    assert items[0]["priority"]["level"] == "critical"
-    only_sms = reviewer.get("/api/reports", params={"channel": "sms"}).json()
-    assert only_sms["total"] == 0
-    crit = reviewer.get("/api/reports", params={"priority_level": "critical"}).json()
-    assert [i["id"] for i in crit["items"]] == [high]
+    assert [i["id"] for i in items] == [second, first]  # newest first, no AI ranking
+    assert "priority" not in items[0]
+    oldest = reviewer.get("/api/reports", params={"sort": "oldest"}).json()["items"]
+    assert [i["id"] for i in oldest] == [first, second]
+    assert reviewer.get("/api/reports", params={"sort": "priority"}).status_code == 400
+    assert reviewer.get("/api/reports", params={"channel": "sms"}).json()["total"] == 0
     assert reviewer.get("/api/reports", params={"q": "larkana"}).json()["total"] == 1
-    newest = [i["created_at"] for i in reviewer.get("/api/reports", params={"sort": "newest"}).json()["items"]]
-    assert newest == sorted(newest, reverse=True)
 
 
 def test_original_reveal_is_audited(reviewer):
@@ -214,8 +223,7 @@ def test_prompt_injection_changes_nothing(reviewer):
     report = reviewer.get(f"/api/reports/{rid}").json()
     assert report["status"] == "pending_review"
     assert report["urgency"] == "unknown"
-    assert report["priority"]["urgency_source"] == "ai_suggestion"
-    assert report["extraction"]["urgency_suggestion"] == "unknown"
+    assert any("ignored" in u for u in report["extraction"]["uncertainties"])
 
 
 def test_retry_extraction(reviewer):
@@ -230,7 +238,7 @@ def test_reviewer_stats(reviewer):
     stats = reviewer.get("/api/stats").json()
     assert stats["by_channel"] == {"whatsapp": 1}
     assert stats["by_status"] == {"pending_review": 1}
-    assert stats["by_priority_level"] == {"high": 1}
+    assert stats["by_urgency"] == {"unknown": 1}
 
 
 def test_not_found_uses_error_format(reviewer):

@@ -11,7 +11,6 @@ from app.errors import APIError
 from app.services import privacy
 from app.services.duplicates import DupView, find_candidates
 from app.services.normalize import normalize, normalize_for_compare
-from app.services.priority import compute_priority
 from app.timeutil import parse_iso
 
 PREVIEW_CHARS = 80
@@ -123,20 +122,18 @@ def load_one(conn: Connection, report_id: str) -> Bundle:
 # ---------- derived values ----------
 
 
-def priority_for(b: Bundle, now: datetime, settings: Settings) -> dict | None:
+def call_obj(b: Bundle) -> dict | None:
     r = b.report
-    return compute_priority(
-        status=r["status"],
-        created_at=r["created_at"],
-        reviewer_urgency=r["urgency"],
-        urgency_set_by_reviewer=bool(r["urgency_set_by_reviewer"]),
-        extraction_status=b.ext_status,
-        ai_urgency=b.ai["urgency_suggestion"] if b.ai else None,
-        needs=b.effective_needs(),
-        any_unmatched_evidence=b.any_unmatched(),
-        now=now,
-        settings=settings,
-    )
+    if r["channel"] != "call":
+        return None
+    return {
+        "duration_seconds": r["call_duration_seconds"],
+        "has_audio": bool(r["audio_path"]),
+        "audio_url": f"/api/reports/{r['id']}/audio" if r["audio_path"] else None,
+        "transcript_status": r["transcript_status"] or "pending",
+        "transcript_model": r["transcript_model"],
+        "transcript_error": r["transcript_error"],
+    }
 
 
 def duplicates_for(b: Bundle, all_bundles: list[Bundle], settings: Settings) -> list[tuple[str, float, list[str]]]:
@@ -176,7 +173,6 @@ def extraction_obj(b: Bundle, intake_notes: list[str]) -> dict:
         "quantities": ai["quantities"] if ai else [],
         "place_name": ai["place_name"] if ai else None,
         "time_reference": ai["time_reference"] if ai else None,
-        "urgency_suggestion": ai["urgency_suggestion"] if ai else None,
         "uncertainties": (list(intake_notes) + ai["uncertainties"]) if ai else list(intake_notes),
     }
 
@@ -229,7 +225,7 @@ def build_report(conn: Connection, b: Bundle, settings: Settings, now: datetime)
         "is_synthetic": bool(r["is_synthetic"]),
         "channel": r["channel"],
         "sender": sender,
-        "priority": priority_for(b, now, settings),
+        "call": call_obj(b),
         "source_text": r["source_text"],
         "masked_text": r["masked_text"],
         "has_image": bool(r["image_path"]),
@@ -253,12 +249,12 @@ def build_list_item(b: Bundle, all_b: list[Bundle], settings: Settings, now: dat
         "created_at": r["created_at"],
         "is_synthetic": bool(r["is_synthetic"]),
         "channel": r["channel"],
-        "priority": priority_for(b, now, settings),
         "preview": r["masked_text"][:PREVIEW_CHARS],
         "language": b.ai["language"] if b.ai else None,
         "needs": b.effective_needs(),
         "place": b.effective_place(),
         "extraction_status": b.ext_status,
+        "transcript_status": r["transcript_status"],
         "status": r["status"],
         "urgency": r["urgency"],
         "duplicate_count": len(duplicates_for(b, all_b, settings)),

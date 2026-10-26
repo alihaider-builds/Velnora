@@ -78,24 +78,24 @@ def ground_output(source: str, out: ExtractionOutput) -> dict:
         "quantities": quantities,
         "place_name": text_field(out.place_name, "place name"),
         "time_reference": text_field(out.time_reference, "time reference"),
-        "urgency_suggestion": out.urgency_suggestion,
         "uncertainties": uncertainties[:10],
     }
 
 
-async def extract_fields(text: str, place_hint: str | None, llm: LLMClient) -> ExtractionResult:
-    """Call the model, validate against the schema, retry once with the validation error."""
+async def extract_fields(text: str, place_hint: str | None, llm: LLMClient,
+                         categories: list[dict]) -> ExtractionResult:
+    """Call the model, validate against the schema and the active categories, retry once."""
     feedback: str | None = None
     raw: str | None = None
     error: str | None = None
     for attempt in (1, 2):
         try:
-            raw = await llm.extract(text, place_hint, feedback)
+            raw = await llm.extract(text, place_hint, categories, feedback)
         except Exception as exc:  # network errors, timeouts, bad responses
             error = f"Model unavailable ({type(exc).__name__})."
             continue
         try:
-            out = ExtractionOutput.model_validate_json(raw)
+            out = ExtractionOutput.model_validate_json(raw, context={"categories": {c["key"] for c in categories}})
         except ValidationError as exc:
             feedback = str(exc)[:1500]
             error = "Model output did not match the schema."

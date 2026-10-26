@@ -1,7 +1,10 @@
 import asyncio
 import json
 
+from app.services.categories import BUILTINS
 from app.services.extraction import extract_fields
+
+CATS = [{**c, "keywords": []} for c in BUILTINS]
 
 VALID = {
     "language": "roman_urdu",
@@ -11,7 +14,6 @@ VALID = {
                    {"value": 9, "label": "children", "evidence": {"phrase": "5 bachay"}}],
     "place_name": {"text": "Buner", "evidence": {"phrase": "Buner"}},
     "time_reference": None,
-    "urgency_suggestion": "high",
     "uncertainties": [],
 }
 TEXT = "Buner mein 5 bachay hain, dawai chahiye"
@@ -24,7 +26,7 @@ class ScriptedLLM:
         self.responses = list(responses)
         self.calls = []
 
-    async def extract(self, text, place_hint, retry_feedback=None):
+    async def extract(self, text, place_hint, categories, retry_feedback=None):
         self.calls.append(retry_feedback)
         item = self.responses.pop(0)
         if isinstance(item, Exception):
@@ -36,7 +38,7 @@ class ScriptedLLM:
 
 
 def run(llm):
-    return asyncio.run(extract_fields(TEXT, None, llm))
+    return asyncio.run(extract_fields(TEXT, None, llm, CATS))
 
 
 def test_valid_output_succeeds_first_time_and_is_grounded():
@@ -54,11 +56,11 @@ def test_quantity_value_must_appear_in_its_evidence():
 
 
 def test_invalid_output_retries_once_with_feedback():
-    bad = json.dumps({**VALID, "urgency_suggestion": "extreme"})
+    bad = json.dumps({**VALID, "language": "klingon"})
     llm = ScriptedLLM(bad, json.dumps(VALID))
     res = run(llm)
     assert res.status == "succeeded" and res.attempts == 2
-    assert llm.calls[0] is None and "urgency_suggestion" in llm.calls[1]
+    assert llm.calls[0] is None and "language" in llm.calls[1]
 
 
 def test_two_invalid_outputs_fail():

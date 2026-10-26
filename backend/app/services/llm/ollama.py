@@ -12,11 +12,12 @@ class OllamaClient:
         self.name = model
         self.timeout = timeout
 
-    async def extract(self, text: str, place_hint: str | None, retry_feedback: str | None = None) -> str:
+    async def extract(self, text: str, place_hint: str | None, categories: list[dict],
+                      retry_feedback: str | None = None) -> str:
         payload = {
             "model": self.name,
-            "messages": build_messages(text, place_hint, retry_feedback),
-            "format": output_json_schema(),
+            "messages": build_messages(text, place_hint, categories, retry_feedback),
+            "format": output_json_schema([c["key"] for c in categories]),
             "stream": False,
             "options": {"temperature": 0},
         }

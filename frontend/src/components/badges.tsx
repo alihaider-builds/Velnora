@@ -1,26 +1,24 @@
 import { BadgeCheck, FlaskConical, Sparkles } from 'lucide-react'
-import type { Channel, Language, NeedCategory, PriorityLevel, ReportStatus } from '../api/types'
-import { CHANNELS, LANGUAGE_LABEL, NEEDS, PRIORITY, STATUS } from '../lib/meta'
+import { useNeeds } from '../api/hooks'
+import type { Channel, Language, NeedCategory, ReportStatus, Urgency } from '../api/types'
+import { CHANNELS, LANGUAGE_LABEL, STATUS, URGENCY_LABEL } from '../lib/meta'
 
 // Every badge pairs colour with an icon and a word — never colour alone (UI_UX_SPEC §1.6).
 
 const pill =
   'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap'
 
-/** Filled pill, white text (§3.1a). */
-export function PriorityBadge({ level, score }: { level: PriorityLevel; score?: number }) {
-  const m = PRIORITY[level]
-  const Icon = m.icon
+/** The reviewer's own urgency decision; nothing is shown until they set one. */
+export function UrgencyBadge({ urgency }: { urgency: Urgency }) {
+  if (urgency === 'unknown') return null
   return (
-    <span className={`${pill} text-white`} style={{ backgroundColor: m.color }}>
-      <Icon size={13} aria-hidden="true" />
-      {m.label}
-      {score !== undefined && <span className="font-normal opacity-90">· {score}</span>}
+    <span className={`${pill} border border-border bg-surface-2 text-text`}>
+      Urgency: {URGENCY_LABEL[urgency]}
     </span>
   )
 }
 
-/** Outlined pill, so status never looks like priority (§3.1a). */
+/** Outlined pill. */
 export function StatusBadge({ status }: { status: ReportStatus }) {
   const m = STATUS[status]
   const Icon = m.icon
@@ -58,7 +56,7 @@ export function NeedChip({
   bilingual?: boolean
   count?: number
 }) {
-  const m = NEEDS[need]
+  const m = useNeeds().meta(need)
   const Icon = m.icon
   return (
     <span
@@ -70,7 +68,7 @@ export function NeedChip({
     >
       <Icon size={13} aria-hidden="true" style={{ color: m.color }} />
       {m.en}
-      {bilingual && (
+      {bilingual && m.ur && (
         <span
           lang="ur"
           dir="rtl"

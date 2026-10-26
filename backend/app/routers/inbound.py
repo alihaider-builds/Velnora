@@ -7,19 +7,21 @@ import base64
 import hashlib
 import hmac
 import logging
+import uuid
 from xml.sax.saxutils import escape
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, Request
+from fastapi import APIRouter, BackgroundTasks, File, Form, Request, UploadFile
 from fastapi.responses import Response
 
 from app.config import Settings
 from app.errors import APIError
 from app.ratelimit import RateLimiter
-from app.routers.deps import schedule_extraction
+from app.routers.deps import schedule_call, schedule_extraction
 from app.schemas import SimulatorRequest, SimulatorResponse
-from app.services.channels import create_report, reply_text
+from app.services.channels import call_reply_text, create_report, reply_text
 from app.services.storage import ImageRejected, save_image
+from app.services.transcription import AudioRejected, check_audio
 
 log = logging.getLogger("relieflens.inbound")
 router = APIRouter(prefix="/api", tags=["inbound"])
@@ -120,3 +122,109 @@ def simulator_send(body: SimulatorRequest, request: Request, background: Backgro
     schedule_extraction(request, background, created.report_id)
     return {"report_id": created.report_id, "reference": created.reference,
             "reply": reply_text(created.reference, settings)}
+
+
+# ---------- helpline calls ----------
+
+VOICE_GREETING = (
+    "ReliefLens helpline. Yeh call record ki jayegi taake volunteer aap ki madad kar sakein. "
+    "Beep ke baad batayein aap kahan hain aur aap ko kya chahiye. "
+    "This call is recorded so volunteers can help. After the beep, say where you are and what you need."
+)
+VOICE_GOODBYE = "Shukriya. Aap ka paigham mil gaya. Thank you, your message was received."
+
+
+def _store_audio(data: bytes, settings: Settings) -> tuple[str, float]:
+    seconds = check_audio(data, settings)
+    name = f"{uuid.uuid4().hex}.wav"
+    folder = settings.resolve(settings.upload_dir)
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / name).write_bytes(data)
+    return name, seconds
+
+
+def _twiml_xml(body: str) -> Response:
+    return Response(content=f'<?xml version="1.0" encoding="UTF-8"?><Response>{body}</Response>',
+                    media_type="text/xml")
+
+
+@router.post("/inbound/voice", tags=["inbound"])
+async def inbound_voice(request: Request):
+    """Twilio calls this when the helpline rings: play the recording notice, then record."""
+    settings = request.app.state.settings
+    params = {k: str(v) for k, v in (await request.form()).items()}
+    _verify(request, params, settings)
+    if params.get("CallSid") and params.get("From"):
+        request.app.state.pending_calls[params["CallSid"]] = params["From"]
+    base = settings.public_base_url.rstrip("/")
+    return _twiml_xml(
+        f'<Say language="en-IN">{escape(VOICE_GREETING)}</Say>'
+        f'<Record maxLength="{min(settings.max_call_seconds, 300)}" playBeep="true" trim="trim-silence" '
+        f'recordingStatusCallback="{escape(base)}/api/inbound/voice/recording" '
+        f'recordingStatusCallbackMethod="POST" recordingStatusCallbackEvent="completed" '
+        f'action="{escape(base)}/api/inbound/voice/done" method="POST"/>'
+    )
+
+
+@router.post("/inbound/voice/done", tags=["inbound"])
+async def inbound_voice_done(request: Request):
+    settings = request.app.state.settings
+    params = {k: str(v) for k, v in (await request.form()).items()}
+    _verify(request, params, settings)
+    return _twiml_xml(f'<Say language="en-IN">{escape(VOICE_GOODBYE)}</Say><Hangup/>')
+
+
+@router.post("/inbound/voice/recording", status_code=204, tags=["inbound"])
+async def inbound_voice_recording(request: Request, background: BackgroundTasks):
+    """Twilio recording-status callback: download the WAV, create a call report, transcribe."""
+    settings = request.app.state.settings
+    params = {k: str(v) for k, v in (await request.form()).items()}
+    _verify(request, params, settings)
+    if params.get("RecordingStatus", "completed") != "completed" or not params.get("RecordingUrl"):
+        return Response(status_code=204)
+    sender = request.app.state.pending_calls.pop(params.get("CallSid", ""), None) or params.get("From")
+    try:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            resp = await client.get(params["RecordingUrl"] + ".wav",
+                                    auth=(settings.twilio_account_sid, settings.twilio_auth_token))
+            resp.raise_for_status()
+        name, seconds = _store_audio(resp.content, settings)
+    except (httpx.HTTPError, AudioRejected) as exc:
+        log.warning("call recording could not be stored: %s", type(exc).__name__)
+        return Response(status_code=204)
+    created = create_report(
+        request.app.state.engine, settings, channel="call", text="", sender=sender, audio_name=name,
+        call_seconds=seconds, provider_message_id=params.get("RecordingSid") or None,
+    )
+    if created.is_new:
+        schedule_call(request, background, created.report_id)
+    return Response(status_code=204)
+
+
+@router.post("/simulator/call", response_model=SimulatorResponse)
+async def simulator_call(
+    request: Request,
+    background: BackgroundTasks,
+    from_: str = Form(..., alias="from", min_length=5, max_length=32),
+    audio: UploadFile = File(...),
+    transcript_hint: str | None = Form(None, max_length=5000),
+):
+    """Demo only: a recorded call from the browser goes through the same path as a real call.
+    `transcript_hint` stands in for speech recognition when no speech model is installed."""
+    settings = request.app.state.settings
+    if not settings.demo_mode:
+        raise APIError(404, "NOT_FOUND", "The simulator is only available in demo mode.")
+    _sim_limit.check(request)
+    if sum(c.isdigit() for c in from_) < 8:
+        raise APIError(400, "VALIDATION_ERROR", "Use a phone-style caller number.",
+                       {"fields": [{"field": "from", "message": "At least 8 digits."}]})
+    data = await audio.read(settings.max_audio_bytes + 1)
+    try:
+        name, seconds = _store_audio(data, settings)
+    except AudioRejected as exc:
+        raise APIError(exc.status, exc.code, exc.message) from exc
+    created = create_report(request.app.state.engine, settings, channel="call", text="", sender=from_,
+                            audio_name=name, call_seconds=seconds)
+    schedule_call(request, background, created.report_id, (transcript_hint or "").strip() or None)
+    return {"report_id": created.report_id, "reference": created.reference,
+            "reply": call_reply_text(created.reference, settings)}

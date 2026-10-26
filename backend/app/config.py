@@ -21,6 +21,13 @@ class Settings(BaseSettings):
     ollama_model: str = "gemma4:e4b"
     llm_timeout_seconds: float = 90.0
 
+    # Call transcription (Gemma 4 audio via Hugging Face Transformers; optional "audio" extra)
+    transcriber_backend: str = "fake"  # "gemma" | "fake"
+    gemma_audio_model: str = "google/gemma-4-E4B-it"
+    transcribe_language: str = "Urdu"
+    max_call_seconds: int = 300
+    max_audio_bytes: int = 10 * 1024 * 1024
+
     # Auth
     reviewer_password_hash: str = ""
     session_secret: str = ""
@@ -30,10 +37,11 @@ class Settings(BaseSettings):
     database_path: str = "storage/relieflens.db"
     upload_dir: str = "storage/uploads"
     max_image_bytes: int = 5 * 1024 * 1024
-    max_request_bytes: int = 6 * 1024 * 1024
+    max_request_bytes: int = 12 * 1024 * 1024
 
-    # Geocoding
+    # Geocoding: Google when GOOGLE_MAPS_API_KEY is set, otherwise OpenStreetMap Nominatim
     geocoder_enabled: bool = True
+    google_maps_api_key: str = ""
     nominatim_url: str = "https://nominatim.openstreetmap.org"
     nominatim_user_agent: str = "ReliefLens/0.1 (+https://github.com/alihaider-builds/Velnora)"
 
@@ -49,11 +57,6 @@ class Settings(BaseSettings):
     public_base_url: str = ""
     sender_hash_secret: str = ""
     helpline_emergency_number: str = "1122"
-
-    # Priority
-    priority_wait_step_minutes: int = 30
-    priority_wait_points_per_step: int = 5
-    priority_wait_max_points: int = 25
 
     # Privacy, demo and limits
     public_coord_decimals: int = 2

@@ -1,5 +1,5 @@
 // In-memory stand-in for the backend, used only when VITE_USE_MOCKS=true.
-// Rules mirror BACKEND_TECH_SPEC.md: §4.5 status rules, §6 duplicates, §8 masking, §17 priority.
+// Rules mirror BACKEND_TECH_SPEC.md: §4.5 status rules, §6 duplicates, §8 masking.
 import type {
   Channel,
   DuplicateCandidate,
@@ -7,12 +7,9 @@ import type {
   Extraction,
   Language,
   NeedCategory,
-  Priority,
-  PriorityLevel,
   PublicReport,
   Report,
   ReportListItem,
-  Urgency,
 } from '../api/types'
 
 export const MOCK_MODEL = 'gemma4:e4b'
@@ -209,9 +206,6 @@ export function fakeExtract(text: string, attempts = 1): Extraction {
   }
 
   const place = GAZETTEER.find((p) => text.includes(p.name))
-  const urgent =
-    needs.some((n) => n.category === 'medicine' || n.category === 'evacuation') ||
-    /foran|urgent|jaldi|فوری/i.test(text)
 
   return {
     status: 'succeeded',
@@ -224,7 +218,6 @@ export function fakeExtract(text: string, attempts = 1): Extraction {
     quantities,
     place_name: place ? { text: place.name, evidence: evidence(text, place.name) } : null,
     time_reference: null,
-    urgency_suggestion: urgent ? 'high' : 'medium',
     uncertainties: place ? [] : ['No place name found in the message.'],
   }
 }
@@ -245,7 +238,6 @@ export function emptyExtraction(
     quantities: [],
     place_name: null,
     time_reference: null,
-    urgency_suggestion: null,
     uncertainties: [],
   }
 }
@@ -258,93 +250,6 @@ export function effectiveNeeds(r: Report): NeedCategory[] {
 
 export function effectivePlace(r: Report): string | null {
   return r.reviewer_fields.place_name ?? r.extraction.place_name?.text ?? null
-}
-
-// ---- §17 Priority -------------------------------------------------------------------------
-
-const URGENCY_POINTS: Record<Urgency, number> = { high: 50, medium: 30, low: 10, unknown: 20 }
-const NEED_POINTS: Record<NeedCategory, number> = {
-  evacuation: 25,
-  medicine: 20,
-  clean_water: 15,
-  food: 10,
-  shelter: 10,
-  other: 0,
-}
-const NEED_REASON: Record<NeedCategory, string> = {
-  evacuation: 'Evacuation needed',
-  medicine: 'Medicine needed',
-  clean_water: 'Clean water needed',
-  food: 'Food needed',
-  shelter: 'Shelter needed',
-  other: 'Other need',
-}
-
-function waitingLabel(min: number): string {
-  if (min < 60) return `${min} min`
-  const h = Math.floor(min / 60)
-  const m = min % 60
-  return m ? `${h} h ${m} min` : `${h} h`
-}
-
-export function computePriority(r: Report, now = Date.now()): Priority | null {
-  if (r.status !== 'pending_review' && r.status !== 'flagged') return null
-  const reasons: string[] = []
-  let score = 0
-
-  const reviewerSet = r.urgency !== 'unknown'
-  const urgency: Urgency = reviewerSet ? r.urgency : (r.extraction.urgency_suggestion ?? 'unknown')
-  const up = URGENCY_POINTS[urgency]
-  score += up
-  reasons.push(
-    reviewerSet
-      ? `Reviewer set urgency: ${urgency} (+${up})`
-      : urgency === 'unknown'
-        ? `Urgency unknown (+${up})`
-        : `AI suggests ${urgency} urgency (+${up})`,
-  )
-
-  const needs = effectiveNeeds(r)
-  const top = needs.reduce<NeedCategory | null>(
-    (best, n) => (best === null || NEED_POINTS[n] > NEED_POINTS[best] ? n : best),
-    null,
-  )
-  if (top && NEED_POINTS[top] > 0) {
-    score += NEED_POINTS[top]
-    reasons.push(`${NEED_REASON[top]} (+${NEED_POINTS[top]})`)
-  }
-
-  const waitMin = Math.max(0, Math.floor((now - new Date(r.created_at).getTime()) / 60000))
-  const wp = Math.min(25, Math.floor(waitMin / 30) * 5)
-  if (wp > 0) reasons.push(`Waiting ${waitingLabel(waitMin)} (+${wp})`)
-  score += wp
-
-  const failed = r.extraction.status === 'failed'
-  const unmatched = [
-    ...r.extraction.needs,
-    ...r.extraction.quantities,
-    ...(r.extraction.place_name ? [r.extraction.place_name] : []),
-    ...(r.extraction.time_reference ? [r.extraction.time_reference] : []),
-  ].some((f) => !f.evidence.matched)
-  if (failed || unmatched) {
-    score += 10
-    reasons.push(
-      failed
-        ? 'Extraction failed — needs manual check (+10)'
-        : 'Evidence not found — needs manual check (+10)',
-    )
-  }
-
-  score = Math.min(100, score)
-  const level: PriorityLevel =
-    score >= 75 ? 'critical' : score >= 55 ? 'high' : score >= 35 ? 'medium' : 'low'
-  return {
-    score,
-    level,
-    reasons,
-    urgency_source: reviewerSet ? 'reviewer' : 'ai_suggestion',
-    computed_at: new Date(now).toISOString(),
-  }
 }
 
 // ---- §6.2 Duplicates ----------------------------------------------------------------------
@@ -438,12 +343,12 @@ export function toListItem(r: Report): ReportListItem {
     created_at: r.created_at,
     is_synthetic: r.is_synthetic,
     channel: r.channel,
-    priority: r.priority,
     preview: Array.from(r.masked_text).slice(0, 80).join(''),
     language: r.extraction.language,
     needs: effectiveNeeds(r),
     place: effectivePlace(r),
     extraction_status: r.extraction.status,
+    transcript_status: r.call?.transcript_status ?? null,
     status: r.status,
     urgency: r.urgency,
     duplicate_count: r.duplicate_count,

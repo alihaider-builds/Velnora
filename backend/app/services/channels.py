@@ -30,6 +30,15 @@ def _reference(conn, report_id: str) -> str:
     return f"RL-{hexid}"
 
 
+def call_reply_text(reference: str, settings: Settings) -> str:
+    n = settings.helpline_emergency_number
+    return (
+        f"Shukriya! Aap ki call record ho gayi hai ({reference}). Ek volunteer isay sun kar review karega. "
+        f"Fori khatray ki soorat mein {n} par call karein.\n"
+        f"Thank you, call {reference} recorded. In a life-threatening emergency, call {n}."
+    )
+
+
 def reply_text(reference: str, settings: Settings) -> str:
     n = settings.helpline_emergency_number
     return (
@@ -54,6 +63,8 @@ def create_report(
     is_synthetic: bool | None = None,
     created_at: str | None = None,
     extra_notes: list[str] | None = None,
+    audio_name: str | None = None,
+    call_seconds: float | None = None,
 ) -> Created:
     """Store a new report (extraction pending). Idempotent on `provider_message_id`."""
     notes = list(extra_notes or [])
@@ -91,6 +102,9 @@ def create_report(
                 submitted_lat=lat,
                 submitted_lng=lng,
                 image_path=image_name,
+                audio_path=audio_name,
+                call_duration_seconds=call_seconds,
+                transcript_status="pending" if channel == "call" else None,
                 intake_notes=notes,
                 status="pending_review",
                 urgency="unknown",

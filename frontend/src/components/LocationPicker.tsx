@@ -5,6 +5,7 @@ import { useConfirmLocation, useGeocode } from '../api/hooks'
 import type { ConfirmLocationRequest, Report } from '../api/types'
 import { PAKISTAN_CENTER } from '../lib/config'
 import { formatCoords } from '../lib/format'
+import { CoordinateInput } from './CoordinateInput'
 import { MapView, type MapMarker } from './MapView'
 import { useToast } from './Toast'
 import { Spinner, errorMessage } from './ui'
@@ -272,6 +273,8 @@ export function LocationPicker({
           Submitter's pin
         </p>
       )}
+
+      <CoordinateInput onSet={pin} />
 
       <div className="flex flex-wrap gap-2">
         <button type="button" className="btn btn-sm" onClick={dropPin}>

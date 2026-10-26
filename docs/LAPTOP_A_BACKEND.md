@@ -1,5 +1,17 @@
 # Laptop A — Backend, AI & Data (start here)
 
+> **v2 changes (26 Oct) — these override anything below:**
+> - **No AI ranking.** The priority score and the AI urgency suggestion are removed. The review queue is
+>   ordered by time (newest first, oldest first on request); the reviewer sets urgency and can filter by it.
+> - **Helpline calls.** Calls are recorded (with a recording notice), transcribed by Gemma 4 when installed,
+>   or typed by the reviewer after listening; then extracted like any message. The simulator has a Call tab.
+> - **Help categories** are managed by the organizer from the dashboard (name, Urdu name, keywords); the AI
+>   uses the active list.
+> - **Location:** better place extraction (e.g. "Lalkurti, Cantt, Rawalpindi"), broader-query map search,
+>   Google Maps tiles + Google geocoding when keys are set (OpenStreetMap otherwise), and manual entry of
+>   coordinates or a pasted Google Maps link.
+> - The API contract is `BACKEND_TECH_SPEC.md` §4 (updated); the code in `backend/` and `frontend/` matches it.
+
 You build **Module A** of ReliefLens: the FastAPI backend, the Gemma 4 extraction, SMS/WhatsApp intake, the priority list logic, data and tests. Laptop B builds the frontend against your API at the same time.
 
 ---

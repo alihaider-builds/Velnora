@@ -15,6 +15,8 @@ from sqlalchemy import (
     Text,
     create_engine,
     event,
+    inspect,
+    text,
 )
 
 metadata = MetaData()
@@ -37,6 +39,11 @@ reports = Table(
     Column("submitted_lat", Float),
     Column("submitted_lng", Float),
     Column("image_path", String),
+    Column("audio_path", String),
+    Column("call_duration_seconds", Float),
+    Column("transcript_status", String),  # None for non-call reports; pending|running|succeeded|failed|manual
+    Column("transcript_model", String),
+    Column("transcript_error", Text),
     Column("intake_notes", JSON, nullable=False, default=list),
     Column("status", String, nullable=False),
     Column("urgency", String, nullable=False),
@@ -87,6 +94,19 @@ audit_log = Table(
     Column("note", Text),
 )
 
+categories = Table(
+    "categories",
+    metadata,
+    Column("key", String, primary_key=True),
+    Column("label", String, nullable=False),
+    Column("label_ur", String),
+    Column("keywords", JSON, nullable=False, default=list),
+    Column("builtin", Boolean, nullable=False, default=False),
+    Column("active", Boolean, nullable=False, default=True),
+    Column("position", Integer, nullable=False, default=0),
+    Column("created_at", String, nullable=False),
+)
+
 geocode_cache = Table(
     "geocode_cache",
     metadata,
@@ -108,4 +128,17 @@ def make_engine(db_path: Path) -> Engine:
         cur.close()
 
     metadata.create_all(engine)
+    _add_missing_columns(engine)
     return engine
+
+
+def _add_missing_columns(engine: Engine) -> None:
+    """Tiny forward-only migration: add columns introduced after a database was created."""
+    insp = inspect(engine)
+    with engine.begin() as conn:
+        for table in metadata.sorted_tables:
+            existing = {c["name"] for c in insp.get_columns(table.name)}
+            for col in table.columns:
+                if col.name not in existing:
+                    ddl = col.type.compile(dialect=engine.dialect)
+                    conn.execute(text(f'ALTER TABLE "{table.name}" ADD COLUMN "{col.name}" {ddl}'))

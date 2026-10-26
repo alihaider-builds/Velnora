@@ -24,9 +24,11 @@ from app.schemas import (
     ReviewerStats,
     ReviewRequest,
     SubmitResponse,
+    TranscriptRequest,
 )
-from app.services import audit
+from app.services import audit, categories
 from app.services.channels import create_report
+from app.services.jobs import set_transcript
 from app.services.storage import ImageRejected, delete_image, media_type, save_image
 from app.timeutil import now_iso, utcnow
 
@@ -118,10 +120,10 @@ def list_reports(
     status: list[str] | None = Query(None),
     need: str | None = None,
     channel: list[str] | None = Query(None),
-    priority_level: list[str] | None = Query(None),
+    urgency: list[str] | None = Query(None),
     extraction_status: str | None = None,
     q: str | None = Query(None, max_length=200),
-    sort: Literal["priority", "newest", "oldest"] = "priority",
+    sort: Literal["newest", "oldest"] = "newest",
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
 ):
@@ -132,20 +134,14 @@ def list_reports(
         b for b in all_b
         if (not status or b.report["status"] in status)
         and (not channel or b.report["channel"] in channel)
+        and (not urgency or b.report["urgency"] in urgency)
         and (not extraction_status or b.ext_status == extraction_status)
         and (not need or need in b.effective_needs())
         and (not q or repo.search_matches(b, q))
     ]
+    # Time order only: the reviewer decides what matters most.
+    selected.sort(key=lambda b: (b.report["created_at"], b.report["reference"]), reverse=sort == "newest")
     items = [repo.build_list_item(b, all_b, settings, now) for b in selected]
-    if priority_level:
-        items = [i for i in items if i["priority"] and i["priority"]["level"] in priority_level]
-
-    if sort == "newest":
-        items.sort(key=lambda i: i["created_at"], reverse=True)
-    elif sort == "oldest":
-        items.sort(key=lambda i: i["created_at"])
-    else:  # highest score first, oldest first on ties, reports without priority last
-        items.sort(key=lambda i: (i["priority"] is None, -(i["priority"] or {}).get("score", 0), i["created_at"]))
 
     start = (page - 1) * page_size
     return {"items": items[start:start + page_size], "total": len(items), "page": page, "page_size": page_size}
@@ -183,6 +179,8 @@ def get_image(report_id: str, request: Request):
 def retry_extraction(report_id: str, request: Request, background: BackgroundTasks):
     with request.app.state.engine.begin() as conn:
         b = repo.load_one(conn, report_id)
+        if b.report["channel"] == "call" and not b.report["source_text"]:
+            raise APIError(409, "TRANSCRIPT_REQUIRED", "Add a transcript first.")
         if b.ext_status in ("pending", "running"):
             raise APIError(409, "EXTRACTION_IN_PROGRESS", "The AI is already reading this report.")
         conn.execute(
@@ -199,12 +197,46 @@ def update_fields(report_id: str, body: ReviewerFields, request: Request):
     changes = body.model_dump(include=body.model_fields_set)
     with request.app.state.engine.begin() as conn:
         b = repo.load_one(conn, report_id)
+        unknown = set(changes.get("needs") or []) - categories.all_keys(conn)
+        if unknown:
+            raise APIError(400, "VALIDATION_ERROR", "Unknown help category.",
+                           {"fields": [{"field": "needs", "message": f"Unknown: {', '.join(sorted(unknown))}"}]})
         if b.report["status"] == "merged":
             raise APIError(409, "INVALID_TRANSITION", "Merged reports can't be edited.")
         current = dict(b.corrections)
         current.update(changes)
         _touch(conn, report_id, reviewer_fields=current)
         audit.record(conn, report_id, "edit_fields", details={"fields": sorted(changes)})
+    return _report_response(request, report_id)
+
+
+@router.get("/reports/{report_id}/audio", dependencies=reviewer)
+def get_audio(report_id: str, request: Request):
+    settings = request.app.state.settings
+    with request.app.state.engine.connect() as conn:
+        b = repo.load_one(conn, report_id)
+    name = b.report["audio_path"]
+    path = settings.resolve(settings.upload_dir) / name if name else None
+    if not path or not path.is_file():
+        raise APIError(404, "NOT_FOUND", "This report has no recording.")
+    return FileResponse(path, media_type="audio/wav", headers={"Cache-Control": "private, no-store"})
+
+
+@router.put("/reports/{report_id}/transcript", response_model=Report, dependencies=reviewer)
+def put_transcript(report_id: str, body: TranscriptRequest, request: Request, background: BackgroundTasks):
+    """Reviewer types or corrects a call transcript after listening; extraction runs again."""
+    with request.app.state.engine.begin() as conn:
+        b = repo.load_one(conn, report_id)
+        if b.report["channel"] != "call":
+            raise APIError(409, "NOT_A_CALL", "Only call reports have a transcript.")
+        if b.report["status"] == "merged":
+            raise APIError(409, "INVALID_TRANSITION", "Merged reports can't be edited.")
+        if b.report["transcript_status"] in ("pending", "running"):
+            raise APIError(409, "TRANSCRIPTION_IN_PROGRESS", "The recording is still being transcribed.")
+        set_transcript(conn, report_id, body.text, "manual", "reviewer")
+        audit.record(conn, report_id, "edit_transcript",
+                     details={"previous_model": b.report["transcript_model"]})
+    schedule_extraction(request, background, report_id)
     return _report_response(request, report_id)
 
 
@@ -221,6 +253,7 @@ def delete_report(report_id: str, request: Request):
         conn.execute(delete(extractions).where(extractions.c.report_id == report_id))
         conn.execute(delete(reports).where(reports.c.id == report_id))
     delete_image(settings.resolve(settings.upload_dir), b.report["image_path"])
+    delete_image(settings.resolve(settings.upload_dir), b.report["audio_path"])
 
 
 @router.post("/reports/{report_id}/location", response_model=Report, dependencies=reviewer)
@@ -310,18 +343,12 @@ def review_report(report_id: str, body: ReviewRequest, request: Request):
 
 @router.get("/stats", response_model=ReviewerStats, dependencies=reviewer)
 def reviewer_stats(request: Request):
-    settings, now = request.app.state.settings, utcnow()
     with request.app.state.engine.connect() as conn:
         all_b = repo.load_all(conn)
-    levels = Counter()
-    for b in all_b:
-        p = repo.priority_for(b, now, settings)
-        if p:
-            levels[p["level"]] += 1
     return {
         "by_status": dict(Counter(b.report["status"] for b in all_b)),
         "by_need": dict(Counter(n for b in all_b for n in b.effective_needs())),
         "by_extraction_status": dict(Counter(b.ext_status for b in all_b)),
         "by_channel": dict(Counter(b.report["channel"] for b in all_b)),
-        "by_priority_level": dict(levels),
+        "by_urgency": dict(Counter(b.report["urgency"] for b in all_b)),
     }

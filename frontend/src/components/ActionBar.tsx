@@ -36,7 +36,6 @@ export function ActionBar({
   const s = report.status
   const reviewable = s === 'pending_review' || s === 'flagged'
   const located = report.location.confirmed !== null
-  const ai = report.extraction.urgency_suggestion
 
   if (s === 'merged') {
     return (
@@ -88,10 +87,10 @@ export function ActionBar({
                     ))}
                   </select>
                   <span id="urgency-help" className="text-xs text-muted">
-                    {urgency === report.urgency && report.urgency === 'unknown' && ai
-                      ? `AI suggested: ${URGENCY_LABEL[ai].toLowerCase()}`
-                      : urgency !== report.urgency
-                        ? 'Saved with your next action'
+                    {urgency !== report.urgency
+                      ? 'Saved with your next action'
+                      : report.urgency === 'unknown'
+                        ? 'Your call — the AI does not rank reports'
                         : ''}
                   </span>
                 </div>

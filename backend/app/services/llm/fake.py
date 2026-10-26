@@ -38,10 +38,37 @@ PLACES = [
     "Pir Baba", "Dera Ismail Khan", "Dera Ghazi Khan", "Buner", "Swat", "Mingora", "Shangla", "Besham", "Daggar",
     "Nowshera", "Charsadda", "Peshawar", "Sukkur", "Larkana", "Dadu", "Jacobabad", "Hyderabad", "Rajanpur",
     "Muzaffargarh", "Multan", "Lahore", "Kasur", "Narowal", "Sialkot", "Karachi", "Quetta", "Gilgit", "Hunza",
-    "Chitral", "Kalam", "Bahrain", "Madyan", "Gujranwala", "Jhang", "Chiniot",
+    "Chitral", "Kalam", "Bahrain", "Madyan", "Gujranwala", "Jhang", "Chiniot", "Rawalpindi", "Islamabad",
+    "Lalkurti", "Lal Kurti", "Saddar", "Murree", "Attock", "Jhelum", "Chakwal", "Mardan", "Swabi", "Abbottabad",
+    "Mansehra", "Kohat", "Bannu", "Faisalabad", "Sargodha", "Bahawalpur", "Sahiwal", "Okara", "Gujrat", "Mirpur",
+    "Muzaffarabad", "Skardu", "Sibi", "Turbat", "Gwadar", "Thatta", "Badin", "Mirpurkhas", "Nawabshah",
+    "Khairpur", "Shikarpur", "Ghotki", "Kashmore", "Taunsa", "Layyah", "Bhakkar", "Mianwali",
     "پیر بابا", "بونیر", "سوات", "مینگورہ", "شانگلہ", "نوشہرہ", "چارسدہ", "پشاور", "سکھر", "دادو", "ملتان",
-    "لاہور", "کراچی", "حیدرآباد",
+    "لاہور", "کراچی", "حیدرآباد", "راولپنڈی", "اسلام آباد", "لال کرتی",
 ]
+
+# Words that can be part of a place phrase ("Lalkurti Cantt", "Sector G-9", "Saddar bazaar")
+AREA_WORDS = {
+    "cantt", "cantonment", "town", "colony", "bazaar", "bazar", "road", "chowk", "sector", "mohalla", "mohalle",
+    "block", "phase", "scheme", "village", "city", "district", "tehsil", "chhaoni",
+    "کینٹ", "محلہ", "محلے", "بازار", "روڈ", "چوک", "سیکٹر",
+}
+# Words that end a place phrase when reading backwards from "mein" / "ke paas"
+PLACE_STOPWORDS = {
+    "hum", "ham", "hamara", "hamare", "hamari", "mera", "meri", "mere", "yahan", "idhar", "wahan", "udhar",
+    "ghar", "gher", "gali", "gaon", "gaoon", "goth", "ilaqa", "ilaqe", "ilaake", "sab", "log", "pani", "paani",
+    "aur", "ka", "ki", "ke", "ab", "abhi", "bhi", "to", "toh", "please", "plz", "help", "madad", "hai", "hain",
+    "tha", "the", "se", "ko", "is", "us", "iss", "uss", "aaj", "kal", "raat", "subah", "bohat", "bahut",
+    "flood", "sailab", "barish", "we", "our", "i", "my", "are", "a", "an", "of",
+    "ہم", "ہمارے", "ہمارا", "ہماری", "میرے", "میرا", "یہاں", "گاؤں", "گھر", "گلی", "سب", "لوگ", "اور", "کے", "کا", "کی",
+}
+_LOCATIVE_AFTER = {"mein", "me", "main", "mai", "men", "wale", "walay", "wali", "میں", "والے"}
+_LOCATIVE_PAIR = {"paas", "pas", "qareeb", "qarib", "kareeb", "nazdeek", "nazdik", "پاس", "قریب", "نزدیک"}
+_LOCATIVE_BEFORE = {"in", "near", "at", "around"}
+_TOKEN = re.compile(r"\S+")
+_EDGE_PUNCT = ".,;:!?()\"'\u060c\u06d4-"
+_SENTENCE_END = ".!?;:\u060c\u06d4"
+_ABBREV = re.compile(r"(?:[A-Za-z]\.)+")
 
 _NUMBER_WORDS = {
     "ek": 1, "do": 2, "teen": 3, "char": 4, "chaar": 4, "panch": 5, "paanch": 5, "chay": 6, "chhe": 6,
@@ -72,7 +99,6 @@ _TIME = re.compile(
     r"کل رات سے|کل رات|کل سے|صبح سے|دو دن سے|تین دن سے)",
     re.IGNORECASE,
 )
-_URGENT = re.compile(r"(fori|foran|urgent|jaldi|emergency|khatra|khatre|فوری|جلدی|خطرہ)", re.IGNORECASE)
 _ROMAN_MARKERS = {
     "mein", "hai", "hain", "ka", "ki", "ke", "nahi", "chahiye", "pani", "ghar", "aur", "se", "hum", "hamare",
 }
@@ -110,14 +136,116 @@ def detect_language(text: str) -> str:
     return "roman_urdu" if roman else "unknown"
 
 
-def heuristic_extract(text: str) -> dict:
-    found: list[tuple[int, str, str]] = []
-    for cat, patterns in _NEED_PATTERNS.items():
-        for pat in patterns:
-            m = pat.search(text)
-            if m:
-                found.append((m.start(), cat, m.group(0)))
+def _bare(token: str) -> str:
+    return token.strip(_EDGE_PUNCT).lower()
+
+
+def _span(tokens: list[tuple[str, int, int]], i: int, j: int, text: str) -> tuple[int, int] | None:
+    """Character span covering tokens[i..j], without edge punctuation."""
+    if i > j:
+        return None
+    start, end = tokens[i][1], tokens[j][2]
+    while start < end and text[start] in _EDGE_PUNCT:
+        start += 1
+    while end > start and text[end - 1] in _EDGE_PUNCT:
+        end -= 1
+    return (start, end) if end > start else None
+
+
+def _gazetteer_hits(text: str) -> list[tuple[int, int]]:
+    hits: list[tuple[int, int]] = []
+    for _, pat in _PLACE_PATTERNS:
+        for m in pat.finditer(text):
+            if not any(a <= m.start() < b for a, b in hits):
+                hits.append((m.start(), m.end()))
+    return sorted(hits)
+
+
+def _phrase_candidates(text: str) -> list[tuple[int, int]]:
+    """Place phrases read around locatives: '<X> mein', '<X> ke paas', 'near <X>', '<X> میں'."""
+    tokens = [(m.group(0), m.start(), m.end()) for m in _TOKEN.finditer(text)]
+    out: list[tuple[int, int]] = []
+    for k, (tok, _, _) in enumerate(tokens):
+        word = _bare(tok)
+        nxt = _bare(tokens[k + 1][0]) if k + 1 < len(tokens) else ""
+        if word in _LOCATIVE_AFTER or (word in ("ke", "کے") and nxt in _LOCATIVE_PAIR):
+            end_idx = k - 1
+            i = end_idx
+            while i >= 0 and end_idx - i < 5:
+                w = _bare(tokens[i][0])
+                if not w or w in PLACE_STOPWORDS or w.isdigit():
+                    break
+                if i < end_idx and tokens[i][0][-1:] in _SENTENCE_END and not _ABBREV.fullmatch(tokens[i][0]):
+                    break  # previous sentence or clause (but not an abbreviation like "D.I.")
+                i -= 1
+            span = _span(tokens, i + 1, end_idx, text)
+            if span:
+                out.append(span)
+        elif word in _LOCATIVE_BEFORE:
+            j = k + 1
+            while j < len(tokens) and j - k <= 5:
+                raw = tokens[j][0].strip(_EDGE_PUNCT)
+                w = raw.lower()
+                if not raw or not (raw[0].isupper() or w in AREA_WORDS or re.fullmatch(r"[a-z]-?\d+", w)):
+                    break
+                j += 1
+                if tokens[j - 1][0][-1:] in _SENTENCE_END:
+                    break
+            span = _span(tokens, k + 1, j - 1, text)
+            if span:
+                out.append(span)
+    # a phrase made only of area words ("mohalle") is not a place
+    return [sp for sp in out if any(_bare(t) not in AREA_WORDS for t in text[sp[0]:sp[1]].split())]
+
+
+def extract_place(text: str) -> dict | None:
+    """Prefer a locative phrase that contains a known place, then any capitalised locative phrase,
+    then a known place extended with neighbouring area words, then any locative phrase."""
+    hits = _gazetteer_hits(text)
+    phrases = _phrase_candidates(text)
+
+    def has_hit(sp: tuple[int, int]) -> bool:
+        return any(sp[0] <= a and b <= sp[1] for a, b in hits)
+
+    chosen = next((sp for sp in phrases if has_hit(sp)), None)
+    if chosen is None:
+        chosen = next((sp for sp in phrases if any(c.isupper() for c in text[sp[0]:sp[1]])), None)
+    if chosen is None and hits:
+        a, b = hits[0]
+        while m := re.match(r"[\s,]+(\S+)", text[b:]):
+            word = m.group(1)
+            if _bare(word) in AREA_WORDS or any(h[0] == b + m.start(1) for h in hits):
+                b = b + m.start(1) + len(word.rstrip(_EDGE_PUNCT))
+            else:
                 break
+        chosen = (a, b)
+    if chosen is None and phrases:
+        chosen = phrases[0]
+    if chosen is None:
+        return None
+    phrase = text[chosen[0]:chosen[1]]
+    display = phrase.title() if phrase.isascii() and phrase == phrase.lower() else phrase
+    return {"text": display, "evidence": {"phrase": phrase}}
+
+
+def heuristic_extract(text: str, categories: list[dict] | None = None) -> dict:
+    allowed = {c["key"] for c in categories} if categories is not None else None
+    patterns: dict[str, list[re.Pattern]] = {
+        k: list(v) for k, v in _NEED_PATTERNS.items() if allowed is None or k in allowed
+    }
+    for c in categories or []:
+        extra = [_term_pattern(w) for w in sorted(c.get("keywords") or [], key=len, reverse=True)]
+        if extra:
+            patterns[c["key"]] = patterns.get(c["key"], []) + extra
+    found: list[tuple[int, str, str]] = []
+    for cat, pats in patterns.items():
+        best = None
+        for pat in pats:
+            m = pat.search(text)
+            if m and (best is None or m.start() < best.start()):
+                best = m
+        if best:
+            found.append((best.start(), cat, best.group(0)))
     found.sort()
     needs = [{"category": cat, "evidence": {"phrase": phrase}} for _, cat, phrase in found]
 
@@ -130,23 +258,10 @@ def heuristic_extract(text: str) -> dict:
         label = _UNITS.get(unit.lower(), _UNITS.get(unit, "people"))
         quantities.append({"value": value, "label": label, "evidence": {"phrase": m.group(0)}})
 
-    place = None
-    for name, pat in _PLACE_PATTERNS:
-        m = pat.search(text)
-        if m:
-            place = {"text": name, "evidence": {"phrase": m.group(0)}}
-            break
+    place = extract_place(text)
 
     t = _TIME.search(text)
     time_ref = {"text": t.group(0), "evidence": {"phrase": t.group(0)}} if t else None
-
-    cats = {n["category"] for n in needs}
-    if "evacuation" in cats or _URGENT.search(text) or ("medicine" in cats and quantities):
-        urgency = "high"
-    elif cats:
-        urgency = "medium"
-    else:
-        urgency = "low"
 
     uncertainties = []
     if place is None:
@@ -155,7 +270,6 @@ def heuristic_extract(text: str) -> dict:
         uncertainties.append("No specific need found in the report.")
     if re.search(r"ignore (all |any )?(previous|prior) instructions", text, re.IGNORECASE):
         uncertainties.append("Report contains instructions aimed at the system; they were ignored.")
-        urgency = "unknown"
 
     return {
         "language": detect_language(text),
@@ -163,7 +277,6 @@ def heuristic_extract(text: str) -> dict:
         "quantities": quantities[:10],
         "place_name": place,
         "time_reference": time_ref,
-        "urgency_suggestion": urgency,
         "uncertainties": uncertainties[:5],
     }
 
@@ -171,8 +284,9 @@ def heuristic_extract(text: str) -> dict:
 class FakeLLMClient:
     name = "fake-heuristic"
 
-    async def extract(self, text: str, place_hint: str | None, retry_feedback: str | None = None) -> str:
-        return json.dumps(heuristic_extract(text), ensure_ascii=False)
+    async def extract(self, text: str, place_hint: str | None, categories: list[dict],
+                      retry_feedback: str | None = None) -> str:
+        return json.dumps(heuristic_extract(text, categories), ensure_ascii=False)
 
     async def is_available(self) -> bool:
         return True

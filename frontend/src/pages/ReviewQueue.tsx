@@ -10,22 +10,30 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
-import { useReports, useStats } from '../api/hooks'
+import { useNeeds, useReports, useStats } from '../api/hooks'
 import type {
   Channel,
   NeedCategory,
-  PriorityLevel,
   ReportListItem,
   ReportListParams,
   ReportSort,
   ReportStatus,
+  Urgency,
 } from '../api/types'
-import { ChannelBadge, DemoTag, LanguageBadge, NeedChip, StatusBadge } from '../components/badges'
-import { PriorityBadgeWithReasons, PriorityHelp } from '../components/Priority'
+import {
+  ChannelBadge,
+  DemoTag,
+  LanguageBadge,
+  NeedChip,
+  StatusBadge,
+  UrgencyBadge,
+} from '../components/badges'
 import { UserText } from '../components/UserText'
 import { EmptyState, ErrorState, Skeleton } from '../components/ui'
 import { exactTime, relativeTime } from '../lib/format'
-import { CHANNEL_ORDER, CHANNELS, NEED_ORDER, NEEDS, PRIORITY, PRIORITY_ORDER } from '../lib/meta'
+import { CHANNEL_ORDER, CHANNELS, URGENCY_LABEL } from '../lib/meta'
+
+const URGENCY_FILTERS: Urgency[] = ['high', 'medium', 'low', 'unknown']
 
 const PAGE_SIZE = 25
 
@@ -60,7 +68,10 @@ function Row({
   onSelect: () => void
 }) {
   const navigate = useNavigate()
-  const extracting = item.extraction_status === 'pending' || item.extraction_status === 'running'
+  const transcribing = item.transcript_status === 'pending' || item.transcript_status === 'running'
+  const extracting =
+    !transcribing && (item.extraction_status === 'pending' || item.extraction_status === 'running')
+  const needsTranscript = item.transcript_status === 'failed'
   const href = `/review/reports/${item.id}`
 
   return (
@@ -72,8 +83,15 @@ function Row({
         selected ? 'bg-surface-2 shadow-[inset_3px_0_0_var(--primary)]' : ''
       } ${moved ? 'row-moved' : ''}`}
     >
-      <div className="row-span-2 lg:row-span-1">
-        <PriorityBadgeWithReasons priority={item.priority} />
+      <div className="row-span-2 flex flex-col items-start gap-1 lg:row-span-1">
+        <time
+          dateTime={item.created_at}
+          title={exactTime(item.created_at)}
+          className="text-sm font-semibold"
+        >
+          {relativeTime(item.created_at)}
+        </time>
+        <UrgencyBadge urgency={item.urgency} />
       </div>
 
       <div className="hidden lg:block">
@@ -105,7 +123,17 @@ function Row({
               <Loader2 size={12} className="animate-spin" aria-hidden="true" /> Reading…
             </span>
           )}
-          {item.extraction_status === 'failed' && (
+          {transcribing && (
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-ai">
+              <Loader2 size={12} className="animate-spin" aria-hidden="true" /> Transcribing call…
+            </span>
+          )}
+          {needsTranscript && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-flagged px-2 py-0.5 text-xs font-semibold text-flagged">
+              <AlertTriangle size={12} aria-hidden="true" /> Needs transcript
+            </span>
+          )}
+          {item.extraction_status === 'failed' && !needsTranscript && (
             <span className="inline-flex items-center gap-1 rounded-full bg-rejected px-2 py-0.5 text-xs font-semibold text-white">
               <AlertTriangle size={12} aria-hidden="true" /> Extraction failed
             </span>
@@ -127,7 +155,7 @@ function Row({
         {item.needs.map((n) => (
           <NeedChip key={n} need={n} />
         ))}
-        {item.needs.length === 0 && !extracting && (
+        {item.needs.length === 0 && !extracting && !transcribing && (
           <span className="text-sm text-muted">No needs yet</span>
         )}
         <span className="flex items-center gap-1 text-sm lg:hidden">
@@ -156,13 +184,6 @@ function Row({
 
       <div className="col-start-2 flex flex-wrap items-center gap-2 lg:col-start-auto lg:flex-col lg:items-end lg:gap-1">
         <StatusBadge status={item.status} />
-        <time
-          dateTime={item.created_at}
-          title={exactTime(item.created_at)}
-          className="text-xs text-muted"
-        >
-          {relativeTime(item.created_at)}
-        </time>
       </div>
     </li>
   )
@@ -173,8 +194,9 @@ export function ReviewQueue() {
   const tab = TABS.find((t) => t.key === params.get('tab')) ?? TABS[0]
   const need = (params.get('need') as NeedCategory | null) ?? undefined
   const channels = params.getAll('channel') as Channel[]
-  const levels = params.getAll('priority_level') as PriorityLevel[]
-  const sort = (params.get('sort') as ReportSort | null) ?? 'priority'
+  const urgencies = params.getAll('urgency') as Urgency[]
+  const sort: ReportSort = params.get('sort') === 'oldest' ? 'oldest' : 'newest'
+  const { order: needKeys, meta } = useNeeds()
   const page = Math.max(1, Number(params.get('page') ?? 1))
   const qParam = params.get('q') ?? ''
   const [search, setSearch] = useState(qParam)
@@ -202,7 +224,7 @@ export function ReviewQueue() {
     status: tab.statuses.length ? tab.statuses : undefined,
     need,
     channel: channels.length ? channels : undefined,
-    priority_level: levels.length ? levels : undefined,
+    urgency: urgencies.length ? urgencies : undefined,
     q: qParam || undefined,
     sort,
     page,
@@ -258,10 +280,11 @@ export function ReviewQueue() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Review queue</h1>
-          <p className="text-sm text-muted">Most urgent first. AI suggests; you decide.</p>
+          <p className="text-sm text-muted">
+            In order of arrival. The AI reads reports; you decide what matters most.
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <PriorityHelp />
           <Link to="/review/dashboard" className="btn btn-sm">
             <LayoutDashboard size={15} aria-hidden="true" /> Dashboard
           </Link>
@@ -299,39 +322,6 @@ export function ReviewQueue() {
         </ul>
       </nav>
 
-      {/* Priority summary strip — each counter toggles a filter */}
-      <div
-        role="group"
-        aria-label="Filter by priority level"
-        className="grid grid-cols-2 gap-2 sm:grid-cols-4"
-      >
-        {PRIORITY_ORDER.map((lvl) => {
-          const m = PRIORITY[lvl]
-          const Icon = m.icon
-          const active = levels.includes(lvl)
-          return (
-            <button
-              key={lvl}
-              type="button"
-              aria-pressed={active}
-              onClick={() => update({ priority_level: toggle(levels, lvl) })}
-              className={`card flex min-h-14 items-center justify-between gap-2 px-3 py-2 text-left ${
-                active ? 'ring-2 ring-offset-1' : ''
-              }`}
-              style={{ ['--tw-ring-color' as string]: m.color, borderLeft: `4px solid ${m.color}` }}
-            >
-              <span className="flex items-center gap-2 text-sm font-semibold">
-                <Icon size={16} aria-hidden="true" style={{ color: m.color }} />
-                {m.label}
-              </span>
-              <span className="text-xl font-bold">
-                {stats.data ? (stats.data.by_priority_level[lvl] ?? 0) : '–'}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-
       {/* Search, filters, sort */}
       <div className="flex flex-wrap items-end gap-3">
         <div className="relative min-w-56 flex-1">
@@ -364,9 +354,9 @@ export function ReviewQueue() {
             onChange={(e) => update({ need: e.target.value || undefined })}
           >
             <option value="">All needs</option>
-            {NEED_ORDER.map((n) => (
+            {needKeys.map((n) => (
               <option key={n} value={n}>
-                {NEEDS[n].en}
+                {meta(n).en}
               </option>
             ))}
           </select>
@@ -391,28 +381,46 @@ export function ReviewQueue() {
             })}
           </div>
         </fieldset>
+        <fieldset>
+          <legend className="text-xs font-semibold text-muted">Your urgency</legend>
+          <div className="flex gap-1">
+            {URGENCY_FILTERS.map((u) => {
+              const active = urgencies.includes(u)
+              return (
+                <button
+                  key={u}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => update({ urgency: toggle(urgencies, u) })}
+                  className={`btn btn-sm min-h-11 ${active ? 'border-primary bg-surface-2 text-primary' : ''}`}
+                >
+                  {u === 'unknown' ? 'Not set' : URGENCY_LABEL[u]}
+                </button>
+              )
+            })}
+          </div>
+        </fieldset>
         <div>
           <label htmlFor="sort" className="text-xs font-semibold text-muted">
-            Sort
+            Order
           </label>
           <select
             id="sort"
             className="input"
             value={sort}
             onChange={(e) =>
-              update({ sort: e.target.value === 'priority' ? undefined : e.target.value })
+              update({ sort: e.target.value === 'newest' ? undefined : e.target.value })
             }
           >
-            <option value="priority">Priority</option>
-            <option value="newest">Newest</option>
-            <option value="oldest">Oldest</option>
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
           </select>
         </div>
       </div>
 
       <section aria-label="Reports" className="card overflow-hidden">
         <div className="hidden grid-cols-[8.5rem_7rem_minmax(0,1fr)_11rem_6.5rem_6rem] gap-x-4 border-b border-border bg-surface-2 px-4 py-2 text-xs font-semibold tracking-wide text-muted uppercase lg:grid">
-          <span>Priority</span>
+          <span>Received</span>
           <span>Channel</span>
           <span>Report</span>
           <span>Needs</span>
@@ -435,7 +443,7 @@ export function ReviewQueue() {
         ) : items.length === 0 ? (
           <EmptyState
             title={
-              tab.key === 'pending' && !qParam && !need && !channels.length && !levels.length
+              tab.key === 'pending' && !qParam && !need && !channels.length && !urgencies.length
                 ? 'No reports waiting.'
                 : 'No reports match these filters.'
             }
@@ -445,7 +453,7 @@ export function ReviewQueue() {
               : 'Try another tab or clear the filters.'}
           </EmptyState>
         ) : (
-          <ol aria-label={`${tab.label} reports, ordered by ${sort}`}>
+          <ol aria-label={`${tab.label} reports, ${sort} first`}>
             {items.map((item, i) => (
               <Row
                 key={item.id}

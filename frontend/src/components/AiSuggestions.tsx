@@ -10,7 +10,7 @@ import {
   X,
 } from 'lucide-react'
 import { useState, type FormEvent, type MutableRefObject, type ReactNode } from 'react'
-import { usePatchFields, useRetryExtraction } from '../api/hooks'
+import { useNeeds, usePatchFields, useRetryExtraction } from '../api/hooks'
 import type {
   Evidence,
   Extraction,
@@ -19,7 +19,7 @@ import type {
   ReviewerFields,
   ReviewerQuantity,
 } from '../api/types'
-import { NEED_ORDER, NEEDS, URGENCY_LABEL } from '../lib/meta'
+import { needMeta } from '../lib/meta'
 import { AiBadge, NeedChip } from './badges'
 import { FieldCard } from './FieldCard'
 import { useToast } from './Toast'
@@ -38,14 +38,17 @@ export interface EvidenceField {
 
 /** Every AI field that carries evidence, in display order. Keys drive highlighting. */
 // eslint-disable-next-line react-refresh/only-export-components
-export function evidenceFields(ex: Extraction): EvidenceField[] {
+export function evidenceFields(
+  ex: Extraction,
+  needLabel: (key: NeedCategory) => string = (k) => needMeta(k).en,
+): EvidenceField[] {
   const out: EvidenceField[] = []
   ex.needs.forEach((n, i) =>
     out.push({
       key: `need-${i}`,
       label: 'Need',
-      name: NEEDS[n.category].en,
-      value: NEEDS[n.category].en,
+      name: needLabel(n.category),
+      value: needLabel(n.category),
       evidence: n.evidence,
     }),
   )
@@ -138,6 +141,7 @@ function EditFieldsForm({
 }) {
   const ex = report.extraction
   const rf = report.reviewer_fields
+  const { meta, order } = useNeeds()
   const toast = useToast()
   const patch = usePatchFields(report.id)
 
@@ -202,9 +206,10 @@ function EditFieldsForm({
       <fieldset>
         <legend className="label">Needs</legend>
         <div className="flex flex-wrap gap-2">
-          {NEED_ORDER.map((n) => {
+          {[...order, ...needs.filter((n) => !order.includes(n))].map((n) => {
             const on = needs.includes(n)
-            const Icon = NEEDS[n].icon
+            const m = meta(n)
+            const Icon = m.icon
             return (
               <label
                 key={n}
@@ -222,8 +227,8 @@ function EditFieldsForm({
                     setNeeds((cur) => (on ? cur.filter((x) => x !== n) : [...cur, n]))
                   }
                 />
-                <Icon size={14} aria-hidden="true" style={{ color: NEEDS[n].color }} />
-                {NEEDS[n].en}
+                <Icon size={14} aria-hidden="true" style={{ color: m.color }} />
+                {m.en}
               </label>
             )
           })}
@@ -348,10 +353,11 @@ export function AiSuggestions({
 }) {
   const ex = report.extraction
   const rf = report.reviewer_fields
+  const { meta } = useNeeds()
   const retry = useRetryExtraction(report.id)
   const patch = usePatchFields(report.id)
   const toast = useToast()
-  const fields = evidenceFields(ex)
+  const fields = evidenceFields(ex, (k) => meta(k).en)
   const hasCorrections =
     rf.needs !== null ||
     rf.quantities !== null ||
@@ -562,18 +568,6 @@ export function AiSuggestions({
             Time: —
           </p>
         )}
-
-        <div className="rounded-lg border-[1.5px] border-dashed border-ai/60 px-3 py-2">
-          <span className="block text-xs font-semibold tracking-wide text-muted uppercase">
-            Urgency suggestion
-          </span>
-          <span className="font-semibold">
-            {ex.urgency_suggestion ? URGENCY_LABEL[ex.urgency_suggestion] : '—'}
-          </span>
-          <span className="block text-xs text-muted">
-            A suggestion only — you set the urgency below.
-          </span>
-        </div>
 
         {ex.uncertainties.length > 0 && (
           <div className="rounded-lg bg-surface-2 px-3 py-2">

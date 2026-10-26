@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { ApiError } from '../api/client'
 import { useDemoMode, useSubmitReport } from '../api/hooks'
+import { CoordinateInput } from '../components/CoordinateInput'
 import { Dialog } from '../components/Dialog'
 import { MapView, type MapMarker } from '../components/MapView'
 import { Callout, Spinner } from '../components/ui'
@@ -35,6 +36,7 @@ function PinPickerDialog({
   onSave: (p: Point) => void
 }) {
   const [draft, setDraft] = useState<Point | null>(initial)
+  const [jump, setJump] = useState<Point | null>(null)
   const markers = useMemo<MapMarker[]>(
     () => (draft ? [{ id: 'pin', ...draft, kind: 'selected', label: 'Your pin' }] : []),
     [draft],
@@ -68,10 +70,18 @@ function PinPickerDialog({
         label="Map for choosing a location"
         className="h-[55vh] min-h-72"
         markers={markers}
-        focus={initial ? { ...initial, zoom: 11 } : null}
+        focus={jump ? { ...jump, zoom: 14 } : initial ? { ...initial, zoom: 11 } : null}
         onPick={(lat, lng) => setDraft({ lat, lng })}
         onDrag={(lat, lng) => setDraft({ lat, lng })}
       />
+      <div className="mt-3">
+        <CoordinateInput
+          onSet={(lat, lng) => {
+            setDraft({ lat, lng })
+            setJump({ lat, lng })
+          }}
+        />
+      </div>
       <p className="mt-3 text-sm text-muted" aria-live="polite">
         {draft ? `Selected: ${formatCoords(draft.lat, draft.lng)}` : 'No pin yet.'}
         {outside && (

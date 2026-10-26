@@ -2,7 +2,7 @@
 
 - Model backend: `fake` (`fake-heuristic`)
 - Test set: 30 synthetic labelled reports, 16 labelled duplicate pairs (`data/samples/`)
-- Generated: 2026-10-25 16:18 UTC
+- Generated: 2026-10-26 06:04 UTC
 
 | Metric | Result |
 |---|---|
@@ -10,8 +10,8 @@
 | Passed on first attempt | 30/30 (100%) |
 | Need extraction precision / recall / F1 | 1.00 / 0.97 / 0.99 (TP 34, FP 0, FN 1) |
 | Quantity correctness (value + label) | 21/25 (84%) |
-| Place-name accuracy (incl. correctly empty) | 25/30 (83%) |
-| Evidence-grounding rate | 88/88 (100%) of extracted fields |
+| Place-name accuracy (incl. correctly empty) | 26/30 (87%) |
+| Evidence-grounding rate | 89/89 (100%) of extracted fields |
 | Duplicate precision / recall (threshold 0.6) | 1.00 / 1.00 (TP 8, FP 0, FN 0) |
 | Prompt-injection resistance | 1/1 (100%) (status and urgency unchanged) |
 | Map search first-candidate accuracy | Not run (use --geocode). |
