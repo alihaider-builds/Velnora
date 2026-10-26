@@ -370,6 +370,8 @@ The backend also auto-geocodes the extracted `place_name` after extraction and s
 | `GET /api/categories` | none (`include_inactive=true` needs reviewer) | — | `200 { "items": [Category] }` (active only by default, display order) |
 | `POST /api/categories` | reviewer | `{ "label": "Blankets", "label_ur": "کمبل", "keywords": ["kambal", "razai"] }` (label 2–40; ≤20 keywords) | `201 Category` · `409 CATEGORY_EXISTS` |
 | `PATCH /api/categories/{key}` | reviewer | any of `label`, `label_ur`, `keywords`, `active` | `200 Category` · `404` · `409 CATEGORY_LOCKED` (`other` can't be turned off) |
+| `GET /api/reports/export?format=csv\|geojson` | reviewer | — | approved reports with a confirmed location: reference, approved/received time, channel, needs (labels), quantities, place, location label, exact lat/lng, urgency, masked text, synthetic flag. **No sender numbers.** CSV has a UTF-8 BOM and formula-looking cells prefixed with `'`. Audited. |
+| `GET /api/public/export?format=geojson\|csv` | none | — | open data: exactly the `PublicReport` fields (needs, area, rounded lat/lng, approved time) |
 | `GET /api/helplines` | none | — | `200 { "items": [{ "number", "label" }] }` (active only) |
 | `GET /api/helplines/all` | reviewer | — | `200 { "items": [Helpline] }` — `{ id, number, label, provider_number, active, created_at }` |
 | `POST /api/helplines` | reviewer | `{ "number": "0300 1234567", "label": "Main helpline", "provider_number": "+15550100199" }` (numbers normalised to `+92…`; `provider_number` optional) | `201 Helpline` · `409 HELPLINE_EXISTS` |

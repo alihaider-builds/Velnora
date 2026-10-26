@@ -13,7 +13,7 @@ export function DownloadApproved({ scope }: { scope: 'review' | 'public' }) {
       </summary>
       <div
         role="menu"
-        className={`absolute z-20 mt-1 flex w-64 flex-col rounded-lg border border-border bg-surface p-1 shadow-card ${scope === 'review' ? 'right-0' : 'left-0'}`}
+        className="absolute left-0 z-20 mt-1 flex w-64 max-w-[calc(100vw-2rem)] flex-col rounded-lg border border-border bg-surface p-1 shadow-card"
       >
         <a
           role="menuitem"
