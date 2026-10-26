@@ -17,6 +17,8 @@ export default defineConfig(({ mode }) => {
     },
   }
 
+  // No cross-origin isolation headers (COOP/COEP): they would let the offline speech engine use
+  // several threads, but they stop MapLibre from loading map tiles (the map stays blank).
   return {
     plugins: [react(), tailwindcss()],
     server: { proxy },

@@ -2,6 +2,7 @@ import { Loader2, Mic, Square, WifiOff } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { prepareForRecognition } from '../lib/audioPrep'
 import { preloadOfflineVoice, transcribeOffline, type OfflineModels } from '../lib/offlineSpeech'
+import { micErrorMessage, micUnavailableReason, openMic } from '../lib/mic'
 import { toMono16k } from '../lib/wav'
 
 const LANGUAGES = [
@@ -106,23 +107,17 @@ export function OfflineVoiceInput({
   }
 
   const start = async () => {
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+    const blocked = micUnavailableReason()
+    if (blocked) {
       setStatus('error')
-      setMessage("This browser can't record audio. Type your report instead.")
+      setMessage(blocked)
       return
     }
     try {
-      stream.current = await navigator.mediaDevices.getUserMedia({ audio: true })
+      stream.current = await openMic()
     } catch (err) {
-      const name = err instanceof DOMException ? err.name : ''
       setStatus('error')
-      setMessage(
-        name === 'NotAllowedError' || name === 'SecurityError'
-          ? "Microphone access is blocked. Allow the microphone in your browser's site settings, then try again."
-          : name === 'NotFoundError'
-            ? 'No microphone was found. Connect one, or type your report.'
-            : "The microphone couldn't be started. Try again, or type your report.",
-      )
+      setMessage(micErrorMessage(err))
       return
     }
     preloadOfflineVoice(models[lang]) // load the speech model while the user talks

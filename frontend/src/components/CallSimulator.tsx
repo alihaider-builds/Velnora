@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { useHealth, useHelplines, useSimulatorCall } from '../api/hooks'
 import { formatPhone } from '../lib/format'
+import { micErrorMessage, micUnavailableReason, openMic } from '../lib/mic'
 import { toWav16k } from '../lib/wav'
 import { Spinner, errorMessage } from './ui'
 
@@ -62,8 +63,15 @@ export function CallSimulator({ from }: { from: string }) {
 
   const start = async () => {
     setError(null)
+    const blocked = micUnavailableReason()
+    if (blocked) return setError(`${blocked} You can also upload an audio file.`)
+    let stream: MediaStream
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      stream = await openMic()
+    } catch (err) {
+      return setError(`${micErrorMessage(err)} You can also upload an audio file.`)
+    }
+    try {
       const rec = new MediaRecorder(stream)
       chunks.current = []
       rec.ondataavailable = (e) => e.data.size && chunks.current.push(e.data)
@@ -82,9 +90,8 @@ export function CallSimulator({ from }: { from: string }) {
         })
       }, 1000)
     } catch {
-      setError(
-        'Microphone not available. Allow microphone access, or upload an audio file instead.',
-      )
+      stream.getTracks().forEach((t) => t.stop())
+      setError('Recording could not start in this browser. Upload an audio file instead.')
     }
   }
 

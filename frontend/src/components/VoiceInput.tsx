@@ -1,5 +1,6 @@
 import { Download, Mic, MicOff, Square, Wifi, WifiOff } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { micUnavailableReason } from '../lib/mic'
 import { offlineVoiceModels, type OfflineModels } from '../lib/offlineSpeech'
 import { OfflineVoiceInput } from './OfflineVoiceInput'
 
@@ -90,7 +91,7 @@ const LANGUAGES = [
 
 const ERROR_MESSAGES: Record<string, string> = {
   'not-allowed':
-    "Microphone access is blocked. Allow the microphone in your browser's site settings, then try again.",
+    'Microphone access is blocked. Click the lock or site-settings icon next to the address, allow the microphone, then try again.',
   'service-not-allowed': 'Voice typing is turned off in this browser. Type your report instead.',
   'no-speech': 'No speech was heard. Try again a little closer to the microphone.',
   'audio-capture': 'No microphone was found. Connect one, or type your report.',
@@ -205,6 +206,11 @@ export function BrowserVoiceInput({
 
   const start = () => {
     if (!Ctor) return
+    if (!window.isSecureContext) {
+      setStatus('error')
+      setMessage(micUnavailableReason() ?? '')
+      return
+    }
     if (blockedOffline) {
       setStatus('error')
       setMessage(offlineHelp())

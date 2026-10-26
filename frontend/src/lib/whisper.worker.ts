@@ -5,6 +5,7 @@
 import { env, pipeline, type AutomaticSpeechRecognitionPipeline } from '@huggingface/transformers'
 import ortMjs from 'onnxruntime-web/ort-wasm-simd-threaded.mjs?url'
 import ortWasm from 'onnxruntime-web/ort-wasm-simd-threaded.wasm?url'
+import { collapseRepeats } from './repeats'
 
 env.allowRemoteModels = false
 env.allowLocalModels = true
@@ -12,8 +13,11 @@ env.localModelPath = '/models/'
 const onnx = env.backends.onnx as { wasm?: { wasmPaths?: unknown; numThreads?: number } }
 if (onnx.wasm) {
   onnx.wasm.wasmPaths = { mjs: ortMjs, wasm: ortWasm }
-  // Threads need cross-origin isolation, which the dev/preview servers don't set.
-  onnx.wasm.numThreads = 1
+  // Threads need cross-origin isolation, which the app doesn't use (it breaks map tiles; see
+  // vite.config.ts); if a host ever enables it, the extra threads are used automatically.
+  onnx.wasm.numThreads = self.crossOriginIsolated
+    ? Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2) - 1))
+    : 1
 }
 
 export type WorkerRequest =
@@ -66,13 +70,18 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       return
     }
     const asr = await load(msg.model)
+    // Fast speech is about 4 words (≈ 12 tokens in Urdu script) a second, so a clip can't need
+    // more than this; the cap ends a stuck, repeating decode in seconds instead of a minute.
+    const seconds = Math.min(30, msg.audio.length / 16000)
     const out = await asr(msg.audio, {
       language: msg.language,
       task: 'transcribe',
       chunk_length_s: 30,
       stride_length_s: 5,
+      max_new_tokens: Math.min(440, Math.ceil(seconds * 15) + 24),
     })
-    const text = (Array.isArray(out) ? out.map((o) => o.text).join(' ') : out.text).trim()
+    const raw = Array.isArray(out) ? out.map((o) => o.text).join(' ') : out.text
+    const text = collapseRepeats(raw.trim())
     post({ type: 'result', id: msg.id, text })
   } catch (err) {
     post({
