@@ -1,10 +1,10 @@
 # ReliefLens
 
-**Multilingual disaster-report intelligence for Pakistan.** ReliefLens turns flood and earthquake reports sent by SMS, WhatsApp, the web or a helpline call — in **Urdu, Roman Urdu or English** — into structured needs that a human reviewer checks, with the AI's suggestions linked to the exact words they came from. Approved needs appear on a privacy-safe public map.
+**Multilingual disaster-report intelligence for Pakistan.** ReliefLens turns flood and earthquake reports sent by victim — in **Urdu, Roman Urdu or English** — into structured needs that a human reviewer checks, with the AI's suggestions linked to the exact words they came from. Approved needs appear on a privacy-safe public map.
 
 > **AI suggests. People decide.** Nothing reaches the public map until a reviewer approves it.
 
-Team **Velnora** · Hacktoberfest Hackathon NUST × NSTP · Tracks: *AI & Intelligent Applications* and *Community & Social Impact* · License: [MIT](LICENSE)
+Team **The Baghools** · License: [MIT](LICENSE)
 
 ---
 
@@ -15,14 +15,13 @@ Team **Velnora** · Hacktoberfest Hackathon NUST × NSTP · Tracks: *AI & Intell
 
 ## Problem statement
 
-During Pakistan's floods, people send help requests in whatever way they can: an SMS from a basic phone, a WhatsApp message, a call. They write the way they speak — often **Roman Urdu** ("*Buner mein pani ghar mein aa gaya, 5 bachay hain, dawai chahiye*"), sometimes Urdu script or English, with local place names and no coordinates.
+During Pakistan's floods, people send help requests in the app and through SMS service. They write the way they speak — often **Roman Urdu** ("*Buner mein pani ghar mein aa gaya, 5 bachay hain, dawai chahiye*"), sometimes Urdu script or English, with local place names and no coordinates.
 
 Relief volunteers then face hundreds of messages that are:
 - **unstructured** — needs, numbers and places are buried in free text;
 - **multilingual** — most tools handle English only;
 - **duplicated** — the same family texts three times, neighbours report the same street;
 - **hard to locate** — "Lalkurti, Cantt, Rawalpindi" is not a pin on a map;
-- **unsafe to publish** — they contain phone numbers and personal details.
 
 Fully automatic AI triage is risky here: a confident but wrong summary can send help to the wrong place. **Intended users:** helpline volunteers and relief coordinators (reviewers), NGOs that need a clean list of verified needs, and the public who want to see where help is needed.
 
@@ -30,12 +29,9 @@ Fully automatic AI triage is risky here: a confident but wrong summary can send 
 
 ReliefLens is a review workstation plus a public map.
 
-**Intake from every channel, one pipeline**
+**Intake from various channels, one pipeline**
 - **SMS to an ordinary SIM** — the helpline phone runs the open-source [textbee](https://textbee.dev) app (or SMS Gateway for Android), which forwards each SMS to ReliefLens through a signed webhook. Tested end to end with a real SMS.
-- **WhatsApp and SMS via Twilio** webhooks (signature-verified), including photos.
 - **Web form** with **voice typing** in Urdu or English: with the Whisper models installed it runs offline in the browser; otherwise the browser's own speech service is used. The dictation can be attached as a **voice note** (on by default, can be unticked) so the reviewer can listen and check the text. Also place suggestions as you type, map pin or pasted coordinates, and photo upload (location data stripped). A confirmation page shows the report's reference number.
-- **Helpline calls** — recorded, then transcribed (Gemma 4 audio when installed) or typed by the reviewer after listening.
-- An in-app **SMS / WhatsApp / call simulator** that uses exactly the same code path, for demos.
 
 **AI extraction with evidence (Gemma 4)**
 - Needs (food, clean water, shelter, medicine, evacuation, plus categories the organizer adds), quantities ("5 children"), place and time.
@@ -58,17 +54,6 @@ ReliefLens is a review workstation plus a public map.
 **Sharing**
 - **Public map** of approved needs only — no text, no numbers, location rounded to ~1 km — with need filters.
 - **Downloads**: approved reports as **CSV** (Excel/Sheets, Urdu-safe) or **GeoJSON** (Google Earth/QGIS) for relief teams; a privacy-filtered open-data export for the public.
-
-### What has been tested live vs. only in automated tests
-
-| Tested in the running app | Implemented with automated tests, not yet tried live |
-|---|---|
-| Web form, review workflow, public map, dashboard, CSV/GeoJSON downloads | Twilio SMS, WhatsApp and voice-call webhooks |
-| Simulator (SMS, WhatsApp, call) | SMS Gateway for Android intake |
-| **Real SMS to the helpline SIM through textbee** | Reply SMS (textbee / gateway) |
-| Offline Whisper voice typing (synthetic speech) | Gemma 4 extraction through Ollama (the demo laptop uses the keyword fallback) |
-| OpenStreetMap place search and type-ahead | Gemma 4 audio transcription of calls |
-| Organizer categories used by the extractor | Google Geocoding / Places / Map Tiles (needs keys) |
 
 ## Architecture
 
@@ -163,15 +148,11 @@ Sign in to the review screens at `/review/login` with the password you hashed ab
 | **Gemma 4 extraction** | Install Ollama, `ollama pull gemma4:e4b` (check the tag with `ollama list`), set `LLM_BACKEND=ollama` in `.env`. Without it, the offline keyword fallback is used. |
 | **Offline voice typing** | `cd frontend && npm run setup:voice` downloads the Whisper models (~315 MB) into `public/models/` (git-ignored). |
 | **SMS to your own SIM** | Install [textbee](https://textbee.dev) on the helpline phone and link it by QR code; set `TEXTBEE_SIGNING_SECRET` (20+ random characters) in `.env`; run `cloudflared tunnel --url http://localhost:8000`; paste the tunnel address and your textbee API key into **Dashboard → SMS to the helpline number → Connect**. Only webhook paths are reachable through the tunnel. |
-| **Twilio SMS / WhatsApp / calls** | Set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `PUBLIC_BASE_URL`; point Twilio webhooks at `/api/inbound/sms`, `/api/inbound/whatsapp`, `/api/inbound/voice`. |
-| **Call transcription (Gemma 4 audio)** | `pip install -e ".[audio]"` and `TRANSCRIBER_BACKEND=gemma` (large download; GPU recommended). |
-| **Google Maps** | `GOOGLE_MAPS_API_KEY` (server, Geocoding API) and `VITE_GOOGLE_MAPS_API_KEY` (browser, Map Tiles API). |
 
 More detail: [`backend/README.md`](backend/README.md).
 
 ### 4. Tests
 ```bash
-cd backend && pytest && ruff check .          # no GPU, model or network needed
 cd frontend && npm test && npm run lint
 cd backend && python ../eval/run_eval.py     # writes eval/results.md (model from LLM_BACKEND)
 ```
@@ -180,31 +161,8 @@ cd backend && python ../eval/run_eval.py     # writes eval/results.md (model fro
 
 **Demo video:** _link to be added_
 
-A two-minute walkthrough of the core flow (all data is synthetic):
-1. **Report** — on the *Simulator* page, send the WhatsApp quick-fill *"Buner mein pani ghar mein aa gaya, 5 bachay hain, dawai aur saaf pani chahiye"* (or text the helpline phone). The phone receives a bilingual reply with a reference such as `RL-3F9A`.
-2. **Review** — the report appears at the top of the *Review* queue within seconds. Open it: the AI suggests *Medicine*, *Clean water*, *5 children* and *Buner*; click each to see the exact phrase highlighted.
-3. **Locate** — pick the suggested map candidate or drop a pin; confirm the location.
-4. **Duplicates** — a similar message from the same village shows up as a possible duplicate; compare and merge.
-5. **Approve** — set urgency and approve. The need appears on the *public map* (rounded location, no text or number).
-6. **Share** — download approved reports as CSV or GeoJSON for the relief team.
-
 **Screenshots:** see [`docs/screenshots/`](docs/screenshots/) (map, submit form, review queue, report with evidence, dashboard).
 
-## Evaluation
-
-`python ../eval/run_eval.py` (run from `backend/`) scores the extraction pipeline on 30 hand-labelled synthetic reports (18 Roman Urdu, 6 English, 4 Urdu, 2 mixed) and 16 labelled duplicate pairs in [`data/samples/`](data/samples/). Latest results ([`eval/results.md`](eval/results.md)) — **measured with the offline keyword fallback, not Gemma 4**:
-
-| Metric | Result |
-|---|---|
-| Schema-valid output | 30/30 |
-| Need extraction precision / recall / F1 | 1.00 / 0.97 / 0.99 |
-| Quantity correctness | 21/25 (84%) |
-| Place-name accuracy | 26/30 (87%) |
-| Evidence grounded in the original text | 89/89 fields |
-| Duplicate precision / recall | 1.00 / 1.00 (8 pairs) |
-| Prompt-injection resistance | 1/1 |
-
-Honest caveats: the test set is small and synthetic, the duplicate threshold (0.6) was tuned on these same pairs, and the Gemma 4 run is pending (set `LLM_BACKEND=ollama` and re-run once Ollama is installed). Automated tests: **118 backend** (pytest) and **46 frontend** (Vitest).
 
 ## Privacy, safety and responsible AI
 
@@ -212,7 +170,7 @@ Honest caveats: the test set is small and synthetic, the duplicate threshold (0.
 - **No AI ranking of emergencies:** the queue is ordered by time; reviewers decide urgency.
 - **Evidence or it didn't happen:** every extracted field must quote its source words; ungrounded fields are flagged.
 - **Privacy by design:** phone numbers are masked in report text and in the UI, senders are stored as keyed hashes for duplicate detection, photo location data is removed, recordings and photos are reviewer-only, and the public map and exports never include text, numbers or exact locations. Reviewer exports never include sender numbers, and spreadsheet cells are protected against formula injection.
-- **Secure intake:** Twilio, textbee and SMS-gateway webhooks are signature-verified; requests through a public tunnel can reach only the webhook paths; rate limits on public endpoints.
+- **Secure intake:**  textbee and SMS-gateway webhooks are signature-verified; requests through a public tunnel can reach only the webhook paths; rate limits on public endpoints.
 - **No secrets in the repository:** `.env`, the database, uploads and downloaded models are git-ignored; `.env.example` contains placeholders only.
 - **Demo data:** all bundled reports are synthetic and clearly labelled as such in the app.
 
@@ -227,25 +185,24 @@ docs/           PRD, UI/UX spec, backend spec, design notes
 
 ## Team contributions
 
-Team **Velnora** — two members, one laptop each, working against a shared API contract.
+Team **The Baghools** — two members, one laptop each, working against a shared API contract.
 
 | Member | Contributions |
 |---|---|
 | **Ali Haider** ([@alihaider-builds](https://github.com/alihaider-builds)) — frontend | Repository and licence; the React app and its core screens (public map, submit, simulator, review queue, report screen with evidence highlighting, location picker, duplicates and merge, dashboard, sign-in); design tokens and layout; mock backend; voice typing with offline Whisper and web voice notes (frontend and backend); frontend tests. About 8,800 lines, mostly `frontend/`. |
-| **KibroPixen** ([@KibroPixen](https://github.com/KibroPixen)) — backend & AI | Product brief, PRD and specs; the FastAPI backend (extraction with evidence grounding, duplicates, geocoding, review workflow, privacy filter, exports); SMS/WhatsApp/Twilio, textbee and SMS-gateway intake; helpline calls; help categories and helplines; evaluation; and frontend features on top of the app (call panel and simulator, category/helpline/SMS panels, place type-ahead, coordinates input, downloads, microphone and blank-map fixes, UI clean-up, responsive fixes). About 6,400 lines of backend and 2,800 of docs. |
+| **KibroPixen(Haris Jahangir)** ([@KibroPixen](https://github.com/KibroPixen)) — backend & AI | Product brief, PRD and specs; the FastAPI backend (extraction with evidence grounding, duplicates, geocoding, review workflow, privacy filter, exports); SMS/WhatsApp/Twilio, textbee and SMS-gateway intake; helpline calls; help categories and helplines; evaluation; and frontend features on top of the app (call panel and simulator, category/helpline/SMS panels, place type-ahead, coordinates input, downloads, microphone and blank-map fixes, UI clean-up, responsive fixes). About 6,400 lines of backend and 2,800 of docs. |
 
 Line counts are additions on `main` from `git log --numstat`; the commit history shows each member's work.
 
 ## AI tools and Kiro
 
 - **AI-assisted development:** the backend, documentation and several frontend fixes were built with **Claude Code** (Anthropic) as a coding assistant. The team chose the product, defined requirements, reviewed the generated code and tested it in the running app.
-- **Kiro:** not used for the work described here, so we do not claim the Kiro marks.
+- **Kiro:** used for the SRS document in the repo as it is good at prompt to SRS, we couldn't use it due to 50 credits
 
 ## Limitations and roadmap
 
-- Gemma 4 extraction needs Ollama on the server; the demo laptop runs the keyword fallback. Gemma 4 audio transcription needs a GPU for good speed.
+- Gemma 4 extraction needs Ollama on the server; the demo laptop runs the keyword fallback.
 - SMS to a normal SIM needs an Android phone running textbee and a tunnel; a dedicated ReliefLens Android app with the gateway built in is planned.
-- SQLite suits a single deployment; a hosted database is the next step for multi-site use.
 - Not production-hardened: single shared reviewer password, no per-user roles yet.
 - The GitHub Actions backend job currently fails at the `pytest` step (Ubuntu, Python 3.12) although all 118 tests pass locally (Windows, Python 3.14); being investigated.
 - `docker-compose.yml` runs the backend only; there is no frontend Dockerfile yet, so use the `npm` steps above for the frontend.
@@ -264,8 +221,7 @@ Issues and pull requests are welcome. Please keep the API contract in `docs/BACK
 - **OpenStreetMap** contributors (map data), **OpenFreeMap** (tiles), **MapLibre GL JS**, **Nominatim** and **Photon** (komoot) for place search.
 - **FastAPI**, **Pydantic**, **SQLAlchemy**, **Uvicorn**, **httpx**, **RapidFuzz**, **Pillow**, **argon2-cffi**, **itsdangerous**, **pytest**, **respx**, **Ruff**.
 - **React**, **Vite**, **TanStack Query**, **React Router**, **Tailwind CSS**, **Lucide**, **Mock Service Worker**, **Vitest**, **Testing Library**.
-- **textbee** and **SMS Gateway for Android** (SMS forwarding), **Twilio**, **Cloudflare Tunnel**.
+- **textbee** and **SMS Gateway for Android** (SMS forwarding), **Cloudflare Tunnel**.
 - Fonts: **Inter** and **Noto Nastaliq Urdu** (Google Fonts).
-- Hacktoberfest Hackathon NUST × NSTP and AWS Student Builder Group NUST.
 
 Each dependency is used under its own licence.
