@@ -58,6 +58,11 @@ export default defineConfig(({ mode }) => {
   if (mode === 'standalone') {
     return {
       base: './',
+      // Set here rather than in an .env file, which git ignores, so the build works on any clone.
+      define: {
+        'import.meta.env.VITE_STANDALONE': JSON.stringify('true'),
+        'import.meta.env.VITE_USE_MOCKS': JSON.stringify('false'),
+      },
       publicDir: false, // the one file needs nothing from public/ (offline voice models stay out)
       plugins: [react(), tailwindcss(), singleFileHtml('dist-standalone')],
       build: {
@@ -66,7 +71,7 @@ export default defineConfig(({ mode }) => {
         assetsInlineLimit: Number.MAX_SAFE_INTEGER,
         cssCodeSplit: false,
         chunkSizeWarningLimit: 10_000,
-        rolldownOptions: { output: { inlineDynamicImports: true } },
+        rolldownOptions: { output: { codeSplitting: false } },
       },
     }
   }

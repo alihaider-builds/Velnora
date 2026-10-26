@@ -8,7 +8,10 @@ import { buildRoutes } from './routes'
 // A file opened from disk has no server to resolve /review etc., so the one-file demo uses #/ URLs.
 const createRouter =
   import.meta.env.VITE_STANDALONE === 'true' ? createHashRouter : createBrowserRouter
-const router = createRouter(buildRoutes({ devTools: import.meta.env.DEV }))
+// The one-file demo also includes the simulator, which normal production builds leave out.
+const router = createRouter(
+  buildRoutes({ devTools: import.meta.env.DEV || import.meta.env.VITE_STANDALONE === 'true' }),
+)
 
 export default function App() {
   return (

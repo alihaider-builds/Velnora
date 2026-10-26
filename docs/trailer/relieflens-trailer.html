@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ReliefLens — Trailer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=Playfair+Display:wght@700;900&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  :root { --red:#e01e1e; --ink:#0b0b0c; --paper:#efe7d6; --blue:#2f6fe0; --green:#18a35c; }
+  * { box-sizing:border-box; margin:0; padding:0 }
+  html,body { height:100%; background:#000; overflow:hidden; font-family:Inter,system-ui,sans-serif; color:#fff }
+  #stage { position:absolute; inset:0; margin:auto; width:min(100vw,177.78vh); height:min(56.25vw,100vh); overflow:hidden; background:#000 }
+  .scene { position:absolute; inset:0; opacity:0; pointer-events:none }
+  .bars::before,.bars::after { content:""; position:absolute; left:0; right:0; height:7%; background:#000; z-index:50 }
+  .bars::before{top:0} .bars::after{bottom:0}
+  #grain { position:absolute; inset:-50%; z-index:60; pointer-events:none; opacity:.09;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    animation:grain .4s steps(4) infinite }
+  @keyframes grain { 0%{transform:translate(0,0)} 25%{transform:translate(-5%,3%)} 50%{transform:translate(4%,-4%)} 75%{transform:translate(-3%,-2%)} 100%{transform:translate(2%,4%)} }
+  #vignette { position:absolute; inset:0; z-index:55; pointer-events:none; background:radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,.85) 100%) }
+  #flash { position:absolute; inset:0; background:#fff; opacity:0; z-index:70; pointer-events:none }
+
+  /* 1 — cold open */
+  #s1 { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2vh; background:#000 }
+  .rec { position:absolute; top:10%; left:4%; font:700 1.6vh 'Courier Prime',monospace; color:var(--red); letter-spacing:.2em }
+  .rec::before { content:"● "; animation:blink 1s steps(2) infinite }
+  @keyframes blink { 50%{opacity:0} }
+  .stamp { font:700 2.2vh 'Courier Prime',monospace; letter-spacing:.35em; color:#bbb }
+  .type { font:900 6.4vh Inter; letter-spacing:.06em; color:#fff; white-space:nowrap; overflow:hidden; border-right:.4vh solid var(--red); width:0 }
+
+  /* 2 — newspapers */
+  #s2 { background:#111 }
+  .paper { position:absolute; width:46%; padding:2.2vh 2.4vh; background:var(--paper); color:var(--ink); box-shadow:0 3vh 6vh rgba(0,0,0,.7); opacity:0 }
+  .paper .mast { font:900 2.2vh 'Playfair Display',serif; border-bottom:.3vh solid var(--ink); padding-bottom:.6vh; display:flex; justify-content:space-between; letter-spacing:.04em }
+  .paper .mast small { font:600 1.2vh Inter; align-self:end }
+  .paper h2 { font:900 5.6vh/1.02 'Playfair Display',serif; margin-top:1.2vh; text-transform:uppercase }
+  .paper p { font:400 1.5vh/1.4 Inter; margin-top:1vh; color:#333 }
+  #p1 { left:4%; top:14%; transform:rotate(-4deg) }
+  #p2 { right:5%; top:20%; transform:rotate(3deg) }
+  #p3 { left:24%; top:44%; transform:rotate(-1.5deg); width:52% }
+  .ticker { position:absolute; left:0; right:0; bottom:7%; height:6.2vh; display:flex; align-items:center; background:#000; z-index:40; border-top:.4vh solid var(--red) }
+  .ticker b { height:100%; display:flex; align-items:center; padding:0 2vh; background:var(--red); font:900 2.4vh Inter; letter-spacing:.08em }
+  .ticker span { white-space:nowrap; font:700 2.3vh Inter; padding-left:3vh; animation:scroll 9s linear infinite }
+  @keyframes scroll { from{transform:translateX(60%)} to{transform:translateX(-100%)} }
+
+  /* 3 — message chaos */
+  #s3 { background:radial-gradient(circle at 50% 40%, #2a0606, #000 70%) }
+  .bubble { position:absolute; max-width:34%; padding:1.1vh 1.6vh; border-radius:1.8vh 1.8vh 1.8vh .4vh; background:#1f2227; border:.15vh solid #3a3f47; font:500 1.9vh/1.3 Inter; color:#e6e6e6; opacity:0; box-shadow:0 1vh 3vh rgba(0,0,0,.6) }
+  .bubble i { display:block; font:700 1.2vh 'Courier Prime',monospace; color:#ff6b6b; font-style:normal; margin-bottom:.4vh }
+  .warn { position:absolute; left:0; right:0; bottom:16%; text-align:center; font:900 4.4vh Inter; letter-spacing:.02em; opacity:0; text-shadow:0 0 3vh #000 }
+  .warn em { color:var(--red); font-style:normal }
+
+  /* 4 — question */
+  #s4 { display:flex; align-items:center; justify-content:center; background:#000 }
+  #s4 h1 { font:900 7vh Inter; letter-spacing:-.01em; text-align:center }
+  #s4 h1 span { color:var(--blue) }
+
+  /* 5 — the app */
+  #s5 { background:linear-gradient(160deg,#eef2f8,#dfe6f2); color:#14171f }
+  .brand { position:absolute; top:10%; left:5%; display:flex; align-items:center; gap:1.2vh; font:900 3.6vh Inter; opacity:0 }
+  .brand b { color:var(--blue) }
+  .app { position:absolute; left:5%; right:5%; top:20%; bottom:12%; display:grid; grid-template-columns:1.15fr 1fr; gap:2.4vh }
+  .card { background:#fff; border-radius:1.6vh; box-shadow:0 1.6vh 4vh rgba(20,30,60,.18); padding:2.2vh; opacity:0; position:relative; overflow:hidden }
+  .lbl { font:800 1.3vh Inter; letter-spacing:.14em; color:#6b7280; text-transform:uppercase }
+  .sms { margin-top:1.2vh; padding:1.6vh; border-radius:1.4vh; background:#f1f4f9; font:500 2.4vh/1.45 Inter }
+  .hl { border-radius:.5vh; padding:0 .3vh; transition:background .3s }
+  .hl.on { background:#ffe58f }
+  .chips { display:flex; flex-wrap:wrap; gap:1vh; margin-top:1.8vh }
+  .chip { display:inline-flex; align-items:center; gap:.7vh; padding:.7vh 1.4vh; border-radius:99vh; border:.2vh solid #d6dbe4; font:700 1.9vh Inter; opacity:0; transform:translateY(1vh) }
+  .chip .d { width:1.2vh; height:1.2vh; border-radius:50% }
+  .gemma { position:absolute; top:2vh; right:2vh; font:800 1.4vh Inter; color:#7c3aed; background:#f3edff; padding:.5vh 1.1vh; border-radius:99vh }
+  .scan { position:absolute; left:0; right:0; height:22%; top:-25%; background:linear-gradient(180deg,transparent,rgba(124,58,237,.18),transparent) }
+  .map { background:#dfe9e1 url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='400'><path d='M0 260 C120 220 200 300 320 240 S520 200 600 230' stroke='%2393c5fd' stroke-width='14' fill='none'/><path d='M60 0 L140 400 M300 0 L260 400 M0 120 L600 160' stroke='%23ffffff' stroke-width='6' opacity='.8'/><path d='M420 0 L480 400' stroke='%23f5d76e' stroke-width='5' opacity='.7'/></svg>") center/cover; padding:0 }
+  .pin { position:absolute; width:3vh; height:3vh; border-radius:50% 50% 50% 0; transform:rotate(-45deg) translateY(-8vh); opacity:0; border:.35vh solid #fff; box-shadow:0 .6vh 1.4vh rgba(0,0,0,.3) }
+  .ok { position:absolute; left:2vh; bottom:2vh; display:flex; gap:1vh; flex-wrap:wrap }
+  .ok span { background:#fff; border-radius:99vh; padding:.7vh 1.3vh; font:800 1.6vh Inter; box-shadow:0 .4vh 1vh rgba(0,0,0,.15); opacity:0 }
+  .stats { position:absolute; left:5%; right:5%; bottom:4.5%; display:flex; justify-content:space-around; z-index:51 }
+  .stat { text-align:center; opacity:0 }
+  .stat b { display:block; font:900 3.4vh Inter; color:var(--blue) }
+  .stat small { font:700 1.4vh Inter; color:#475569; letter-spacing:.06em; text-transform:uppercase }
+
+  /* 5b — features */
+  #s7 { background:radial-gradient(circle at 50% 30%,#13284d,#05080f 75%); padding:9% 5% 0 }
+  #s7 h3 { font:900 3.4vh Inter; letter-spacing:.02em; margin-bottom:2.2vh; opacity:0 }
+  #s7 h3 span { color:#ffd166 }
+  .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:1.6vh }
+  .feat { background:rgba(255,255,255,.06); border:.15vh solid rgba(255,255,255,.14); border-radius:1.4vh; padding:1.5vh 1.6vh; opacity:0 }
+  .feat .ic { font-size:2.8vh }
+  .feat b { display:block; font:800 1.95vh Inter; margin-top:.6vh }
+  .feat small { display:block; font:500 1.45vh/1.35 Inter; color:#a8b8d4; margin-top:.4vh }
+
+  /* 6 — end card */
+  #s6 { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2vh; background:radial-gradient(circle at center,#0d1b33,#000 75%) }
+  #s6 .logo { font:900 9vh Inter; letter-spacing:-.02em }
+  #s6 .logo b { color:var(--blue) }
+  #s6 .tag { font:800 3vh Inter; letter-spacing:.04em }
+  #s6 .tag span { color:#ffd166 }
+  #s6 .sub { font:600 1.8vh Inter; color:#9fb3d1; letter-spacing:.18em; text-transform:uppercase }
+
+  #start { position:absolute; inset:0; z-index:100; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2vh; background:#000; cursor:pointer }
+  #start button { font:900 2.6vh Inter; padding:1.6vh 4vh; border-radius:99vh; border:0; background:var(--red); color:#fff; cursor:pointer }
+  #start p { color:#888; font:500 1.6vh Inter }
+  .src { position:absolute; right:2%; bottom:14.5%; font:500 1.1vh Inter; color:#777; z-index:45 }
+</style>
+</head>
+<body>
+<div id="stage" class="bars">
+  <div id="grain"></div><div id="vignette"></div><div id="flash"></div>
+
+  <section class="scene" id="s1">
+    <div class="rec">REC · LIVE FEED</div>
+    <div class="stamp">AUGUST 2022 · SINDH, PAKISTAN · 03:14</div>
+    <div class="type" id="type">THE WATER DIDN'T STOP.</div>
+  </section>
+
+  <section class="scene" id="s2">
+    <div class="paper" id="p1"><div class="mast">THE DAILY RECORD <small>MONSOON EDITION</small></div><h2>33 million affected</h2><p>Record floods sweep across Pakistan.</p></div>
+    <div class="paper" id="p2"><div class="mast">EVENING DISPATCH <small>SPECIAL REPORT</small></div><h2>A third of the country under water</h2><p>Roads, bridges and phone lines cut off.</p></div>
+    <div class="paper" id="p3"><div class="mast">NATIONAL HERALD <small>LATE CITY</small></div><h2>More than 1,700 lives lost</h2><p>Rescue teams struggle to reach those calling for help.</p></div>
+    <div class="ticker"><b>BREAKING</b><span>FLOODS · THOUSANDS OF DISTRESS MESSAGES · RESCUERS CAN'T TELL WHO NEEDS WHAT, OR WHERE · FLOODS · THOUSANDS OF DISTRESS MESSAGES</span></div>
+    <div class="src">Figures: 2022 Pakistan floods (UN / NDMA reports). Newspapers are illustrative.</div>
+  </section>
+
+  <section class="scene" id="s3">
+    <div class="warn" id="warn">Thousands of messages. <em>Duplicates. No locations.</em><br/>Help goes to the wrong place.</div>
+  </section>
+
+  <section class="scene" id="s4"><h1>What if every message<br/>was <span>read, verified and mapped</span>?</h1></section>
+
+  <section class="scene" id="s5">
+    <div class="brand" id="brand">📍 Relief<b>Lens</b></div>
+    <div class="app">
+      <div class="card" id="c1">
+        <div class="scan" id="scan"></div>
+        <span class="gemma">✦ GEMMA 4</span>
+        <div class="lbl">Incoming SMS · Roman Urdu</div>
+        <div class="sms"><span class="hl" id="h1">Buner</span> mein pani ghar mein aa gaya, <span class="hl" id="h2">5 bachay</span> hain, <span class="hl" id="h3">dawai</span> aur <span class="hl" id="h4">saaf pani</span> chahiye</div>
+        <div class="lbl" style="margin-top:2vh">AI suggestions · with evidence</div>
+        <div class="chips">
+          <span class="chip" id="k1"><span class="d" style="background:#e87ba4"></span>Medicine</span>
+          <span class="chip" id="k2"><span class="d" style="background:#2a78d6"></span>Clean water</span>
+          <span class="chip" id="k3"><span class="d" style="background:#475569"></span>5 children</span>
+          <span class="chip" id="k4"><span class="d" style="background:#18a35c"></span>📍 Buner</span>
+        </div>
+      </div>
+      <div class="card map" id="c2">
+        <span class="pin" id="pin1" style="left:38%;top:44%;background:#e87ba4"></span>
+        <span class="pin" id="pin2" style="left:56%;top:30%;background:#eda100"></span>
+        <span class="pin" id="pin3" style="left:66%;top:58%;background:#1baf7a"></span>
+        <div class="ok"><span id="o1">✓ Reviewer approved</span><span id="o2">⧉ Duplicate merged</span></div>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat" id="t1"><b>Seconds</b><small>to structure a report</small></div>
+      <div class="stat" id="t2"><b>One list</b><small>for every rescue team</small></div>
+      <div class="stat" id="t3"><b>Fewer trips</b><small>less fuel wasted</small></div>
+    </div>
+  </section>
+
+  <section class="scene" id="s7">
+    <h3 id="fh">Everything a relief team needs, <span>in one app</span></h3>
+    <div class="grid">
+      <div class="feat" id="f0"><span class="ic">📱</span><b>SMS to the helpline</b><small>Works from any basic phone, no internet</small></div>
+      <div class="feat" id="f1"><span class="ic">🎙️</span><b>In-app report + voice</b><small>Type or speak in Urdu or English</small></div>
+      <div class="feat" id="f2"><span class="ic">✦</span><b>Gemma 4 extraction</b><small>Needs, quantities, place and time</small></div>
+      <div class="feat" id="f3"><span class="ic">🔍</span><b>Evidence for every field</b><small>Click a suggestion, see the exact words</small></div>
+      <div class="feat" id="f4"><span class="ic">🗣️</span><b>Roman Urdu · Urdu · English</b><small>Mixed text understood</small></div>
+      <div class="feat" id="f5"><span class="ic">⧉</span><b>Duplicate detection</b><small>Same family, same street, merged</small></div>
+      <div class="feat" id="f6"><span class="ic">📍</span><b>Smart place search</b><small>Map pin, fallbacks, pasted coordinates</small></div>
+      <div class="feat" id="f7"><span class="ic">🧑‍💼</span><b>Human review queue</b><small>Approve, reject, flag; full history</small></div>
+      <div class="feat" id="f8"><span class="ic">🏷️</span><b>Custom help categories</b><small>Add Blankets, Tents… AI uses them</small></div>
+      <div class="feat" id="f9"><span class="ic">🛡️</span><b>Privacy-safe public map</b><small>No text, numbers or exact locations</small></div>
+      <div class="feat" id="f10"><span class="ic">⬇️</span><b>CSV / GeoJSON export</b><small>Route and stock planning for teams</small></div>
+      <div class="feat" id="f11"><span class="ic">🗄️</span><b>Supabase + open source</b><small>PostgreSQL backend, MIT licence</small></div>
+    </div>
+  </section>
+
+  <section class="scene" id="s6">
+    <div class="logo">📍 Relief<b>Lens</b></div>
+    <div class="tag">AI suggests. <span>People decide.</span></div>
+    <div class="sub">SMS · Urdu · Roman Urdu · English · Gemma 4</div>
+  </section>
+
+  <div id="start"><button>▶ PLAY</button><p>21 seconds · press R to replay · F for fullscreen</p></div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s)
+const show = (id, d = 300) => $(id).animate([{ opacity: 0 }, { opacity: 1 }], { duration: d, fill: 'forwards' })
+const hide = (id, d = 300) => $(id).animate([{ opacity: 1 }, { opacity: 0 }], { duration: d, fill: 'forwards' })
+const flash = () => $('#flash').animate([{ opacity: .9 }, { opacity: 0 }], { duration: 260 })
+const shake = () => $('#stage').animate([{ transform: 'translate(0,0)' }, { transform: 'translate(-8px,5px)' }, { transform: 'translate(7px,-6px)' }, { transform: 'translate(0,0)' }], { duration: 220 })
+const slam = (id) => $(id).animate([{ opacity: 0, transform: getComputedStyle($(id)).transform + ' scale(1.6)' }, { opacity: 1, transform: getComputedStyle($(id)).transform + ' scale(1)' }], { duration: 260, easing: 'cubic-bezier(.2,.8,.2,1.2)', fill: 'forwards' })
+const pop = (id) => $(id).animate([{ opacity: 0, transform: 'translateY(1vh) scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: 300, easing: 'cubic-bezier(.2,.9,.3,1.3)', fill: 'forwards' })
+
+const MSGS = [
+  ['+92 3•• ••• ••41', 'pani ghar mein aa gaya, bachay phanse hain'],
+  ['+92 3•• ••• ••08', 'HELP Rajanpur, chhat pe hain 12 log'],
+  ['+92 3•• ••• ••41', 'pani ghar mein aa gaya!! bachay phanse hain'],
+  ['+92 3•• ••• ••77', 'dawai khatam, buzurg bemar hain'],
+  ['+92 3•• ••• ••19', 'سڑک بہہ گئی، کھانا نہیں ہے'],
+  ['+92 3•• ••• ••52', 'Dadu ke paas, koi rasta nahi'],
+  ['+92 3•• ••• ••08', 'please jaldi, pani barh raha hai'],
+  ['+92 3•• ••• ••93', 'saaf pani chahiye, 30 families'],
+  ['+92 3•• ••• ••64', 'kahan ho tum log??'],
+]
+
+// --- sound: low drone, heartbeat, hits (Web Audio, no files) ---
+let ac, master
+function audio() {
+  ac = new (window.AudioContext || window.webkitAudioContext)()
+  master = ac.createGain(); master.gain.value = .55; master.connect(ac.destination)
+  const drone = (f, t0, t1, g = .12) => { const o = ac.createOscillator(), v = ac.createGain(); o.type = 'sawtooth'; o.frequency.value = f
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 260
+    v.gain.setValueAtTime(0, ac.currentTime + t0); v.gain.linearRampToValueAtTime(g, ac.currentTime + t0 + 1.5); v.gain.linearRampToValueAtTime(0, ac.currentTime + t1)
+    o.connect(lp).connect(v).connect(master); o.start(ac.currentTime + t0); o.stop(ac.currentTime + t1 + .1) }
+  drone(55, 0, 10.6); drone(55.6, 0, 10.6); drone(82.4, 3, 10.6, .07)
+  const thump = (t, f = 60, g = .9) => { const o = ac.createOscillator(), v = ac.createGain(); o.frequency.setValueAtTime(f * 2.2, ac.currentTime + t); o.frequency.exponentialRampToValueAtTime(f * .6, ac.currentTime + t + .22)
+    v.gain.setValueAtTime(g, ac.currentTime + t); v.gain.exponentialRampToValueAtTime(.001, ac.currentTime + t + .35); o.connect(v).connect(master); o.start(ac.currentTime + t); o.stop(ac.currentTime + t + .4) }
+  for (let t = .4; t < 10; t += t < 6 ? 1.0 : .55) { thump(t); thump(t + .22, 60, .5) }
+  ;[3.1, 4.0, 4.9].forEach((t) => thump(t, 38, 1))
+  // rise into the reveal, then a warm major chord
+  const rise = ac.createOscillator(), rv = ac.createGain(); rise.type = 'sine'; rise.frequency.setValueAtTime(200, ac.currentTime + 8.6); rise.frequency.exponentialRampToValueAtTime(1400, ac.currentTime + 10.4)
+  rv.gain.setValueAtTime(0, ac.currentTime + 8.6); rv.gain.linearRampToValueAtTime(.08, ac.currentTime + 10.3); rv.gain.linearRampToValueAtTime(0, ac.currentTime + 10.5); rise.connect(rv).connect(master); rise.start(ac.currentTime + 8.6); rise.stop(ac.currentTime + 10.6)
+  ;[261.6, 329.6, 392, 523.3].forEach((f) => { const o = ac.createOscillator(), v = ac.createGain(); o.type = 'triangle'; o.frequency.value = f
+    v.gain.setValueAtTime(0, ac.currentTime + 11.2); v.gain.linearRampToValueAtTime(.06, ac.currentTime + 12); v.gain.setValueAtTime(.06, ac.currentTime + 19.5); v.gain.linearRampToValueAtTime(0, ac.currentTime + 21)
+    o.connect(v).connect(master); o.start(ac.currentTime + 11.2); o.stop(ac.currentTime + 21.1) })
+  const tick = (t) => { const o = ac.createOscillator(), v = ac.createGain(); o.type = 'square'; o.frequency.value = 1800; v.gain.setValueAtTime(.05, ac.currentTime + t); v.gain.exponentialRampToValueAtTime(.0001, ac.currentTime + t + .05); o.connect(v).connect(master); o.start(ac.currentTime + t); o.stop(ac.currentTime + t + .06) }
+  ;[12.0, 12.28, 12.56, 12.84, 13.2, 13.4, 13.6].forEach(tick)
+  for (let i = 0; i < 12; i++) tick(15.5 + i * .18)
+}
+
+// --- timeline ---
+let timers = []
+const at = (s, fn) => timers.push(setTimeout(fn, s * 1000))
+function play() {
+  timers.forEach(clearTimeout); timers = []
+  document.querySelectorAll('.scene, .paper, .bubble, .chip, .card, .pin, .ok span, .stat, .feat, #fh, #brand, #warn').forEach((e) => e.getAnimations().forEach((a) => a.cancel()))
+  document.querySelectorAll('.bubble').forEach((b) => b.remove()); document.querySelectorAll('.hl').forEach((h) => h.classList.remove('on'))
+  try { if (ac) ac.close(); audio() } catch {}
+
+  // 0–3s cold open
+  show('#s1', 200)
+  at(.5, () => $('#type').animate([{ width: '0' }, { width: '21ch' }], { duration: 1500, easing: 'steps(22)', fill: 'forwards' }))
+  at(2.9, () => { hide('#s1', 120); flash() })
+  // 3–6.6s newspapers
+  at(3.0, () => { show('#s2', 80); slam('#p1'); shake() })
+  at(3.9, () => { slam('#p2'); shake() })
+  at(4.8, () => { slam('#p3'); shake() })
+  at(5.8, () => $('#s2').animate([{ transform: 'scale(1)' }, { transform: 'scale(1.08)' }], { duration: 900, fill: 'forwards' }))
+  at(6.6, () => { hide('#s2', 150); flash() })
+  // 6.7–9.4s message chaos
+  at(6.7, () => {
+    show('#s3', 100)
+    MSGS.forEach(([n, t], i) => at(.05 + i * .17, () => {
+      const b = document.createElement('div'); b.className = 'bubble'; b.innerHTML = `<i>${n}</i>${t}`
+      b.style.left = (4 + Math.random() * 60) + '%'; b.style.top = (10 + Math.random() * 52) + '%'
+      b.style.transform = `rotate(${(Math.random() * 10 - 5).toFixed(1)}deg)`; $('#s3').appendChild(b)
+      b.animate([{ opacity: 0, transform: b.style.transform + ' scale(.6)' }, { opacity: 1, transform: b.style.transform + ' scale(1)' }], { duration: 180, fill: 'forwards' })
+    }))
+  })
+  at(8.3, () => pop('#warn'))
+  at(9.4, () => { hide('#s3', 120); $('#s3').animate([{ filter: 'none' }, { filter: 'hue-rotate(90deg) blur(2px)' }], { duration: 120 }) })
+  // 9.5–11s question
+  at(9.5, () => show('#s4', 250))
+  at(10.9, () => { hide('#s4', 200); flash() })
+  // 11–17.6s the app
+  at(11.0, () => { show('#s5', 250); pop('#brand') })
+  at(11.3, () => pop('#c1'))
+  at(11.6, () => pop('#c2'))
+  at(11.7, () => $('#scan').animate([{ top: '-25%' }, { top: '105%' }], { duration: 900, easing: 'ease-in-out' }))
+  ;[['#h3', '#k1'], ['#h4', '#k2'], ['#h2', '#k3'], ['#h1', '#k4']].forEach(([h, k], i) => at(12.0 + i * .28, () => { $(h).classList.add('on'); pop(k) }))
+  ;['#pin1', '#pin2', '#pin3'].forEach((p, i) => at(13.2 + i * .2, () => $(p).animate([{ opacity: 0, transform: 'rotate(-45deg) translateY(-8vh)' }, { opacity: 1, transform: 'rotate(-45deg) translateY(0)' }], { duration: 340, easing: 'cubic-bezier(.3,1.6,.5,1)', fill: 'forwards' })))
+  at(13.8, () => pop('#o2'))
+  at(14.1, () => pop('#o1'))
+  ;['#t1', '#t2', '#t3'].forEach((t, i) => at(14.3 + i * .2, () => pop(t)))
+  at(15.2, () => { hide('#s5', 200); flash() })
+  // 15.3–18.6s feature showcase
+  at(15.3, () => { show('#s7', 150); pop('#fh') })
+  for (let i = 0; i < 12; i++) at(15.5 + i * .18, () => pop('#f' + i))
+  at(18.6, () => hide('#s7', 250))
+  // 17.8–20s end card
+  at(18.8, () => { show('#s6', 400); $('#s6 .logo').animate([{ transform: 'scale(.92)', letterSpacing: '.1em' }, { transform: 'scale(1)', letterSpacing: '-.02em' }], { duration: 1600, easing: 'ease-out', fill: 'forwards' }) })
+}
+
+$('#start').addEventListener('click', () => { $('#start').style.display = 'none'; play() })
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'r' || e.key === 'R') { $('#start').style.display = 'none'; play() }
+  if (e.key === 'f' || e.key === 'F') document.documentElement.requestFullscreen?.()
+})
+</script>
+</body>
+</html>
