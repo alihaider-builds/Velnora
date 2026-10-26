@@ -748,6 +748,8 @@ The emergency number comes from `HELPLINE_EMERGENCY_NUMBER`. The reply never con
 - **Auth:** `X-Signature` = hex HMAC-SHA256(`SMS_GATEWAY_SIGNING_KEY`, raw body + `X-Timestamp`); timestamp within ±5 min. Missing key → `503 CHANNEL_NOT_CONFIGURED`; bad signature/timestamp → `403 INVALID_SIGNATURE`.
 - **Body:** `{ "event": "sms:received", "id": "…", "payload": { "message", "sender", "recipient", "simNumber", "receivedAt", "messageId" } }`. Other events → `204`. Empty text or sender → `204`.
 - **Effect:** an `sms` report (same path as Twilio SMS), idempotent on the envelope `id` (reused across gateway retries); `recipient` is matched against helpline numbers. Response `200 { "reference", "duplicate" }`.
+- **Dashboard (reviewer):** `GET /api/sms-gateway/status` → `{ configured, reply_enabled, has_credentials, webhook_path, last_received_at, received_24h }`; `POST /api/sms-gateway/register` `{ public_url (https), username?, password? }` registers `public_url + /api/inbound/sms-gateway` with the gateway cloud API, deleting older `sms:received` registrations for that path → `{ webhook_url, webhook_id, replaced }` · `400 GATEWAY_AUTH_FAILED` · `502 GATEWAY_UNAVAILABLE`. Credentials typed in the dashboard are not stored.
+- **Tunnel guard:** with `TUNNEL_INBOUND_ONLY=true` (default) any request carrying Cloudflare's `cf-ray`/`cf-connecting-ip` headers is refused (`403 TUNNEL_PATH_BLOCKED`) unless its path starts with `/api/inbound/`.
 - **Reply (optional, `SMS_GATEWAY_REPLY=true`):** the §16.3 text is sent back through `POST {SMS_GATEWAY_API_URL}/messages` (`{"textMessage":{"text"},"phoneNumbers":[sender],"simNumber"}`, basic auth), after the response; failures are logged and never lose the report.
 
 ### 16.4 Connecting real channels (P1, only after C4)

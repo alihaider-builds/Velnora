@@ -62,3 +62,31 @@ async def send_reply(settings: Settings, to: str, text: str, sim_number: int | N
             resp.raise_for_status()
     except httpx.HTTPError as exc:
         log.warning("reply SMS could not be sent: %s", type(exc).__name__)
+
+
+WEBHOOK_PATH = "/api/inbound/sms-gateway"
+
+
+async def register_webhook(settings: Settings, public_url: str, username: str, password: str) -> dict:
+    """Point the gateway's sms:received webhook at this backend. Quick-tunnel URLs change on every
+    start, so older registrations for our path are removed first."""
+    base = settings.sms_gateway_api_url.rstrip("/")
+    url = public_url.rstrip("/") + WEBHOOK_PATH
+    auth = (username, password)
+    replaced = 0
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            existing = await client.get(f"{base}/webhooks", auth=auth)
+            if existing.status_code == 401:
+                raise GatewayRejected(400, "GATEWAY_AUTH_FAILED", "The gateway username or password is wrong.")
+            existing.raise_for_status()
+            for hook in existing.json() or []:
+                if hook.get("event") == "sms:received" and str(hook.get("url", "")).endswith(WEBHOOK_PATH):
+                    (await client.delete(f"{base}/webhooks/{hook['id']}", auth=auth)).raise_for_status()
+                    replaced += 1
+            resp = await client.post(f"{base}/webhooks", auth=auth, json={"url": url, "event": "sms:received"})
+            resp.raise_for_status()
+            created = resp.json() if resp.content else {}
+    except httpx.HTTPError as exc:
+        raise GatewayRejected(502, "GATEWAY_UNAVAILABLE", "Couldn't reach the SMS gateway service.") from exc
+    return {"webhook_url": url, "webhook_id": created.get("id"), "replaced": replaced}

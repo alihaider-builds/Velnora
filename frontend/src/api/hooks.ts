@@ -32,6 +32,9 @@ import type {
   ReviewRequest,
   SimulatorSendRequest,
   SimulatorSendResponse,
+  SmsGatewayRegisterRequest,
+  SmsGatewayRegistered,
+  SmsGatewayStatus,
   TranscriptRequest,
 } from './types'
 
@@ -353,5 +356,24 @@ export function usePlaceSuggestions(q: string) {
     enabled: query.length >= 3,
     staleTime: 5 * 60_000,
     retry: false,
+  })
+}
+
+// ---- SMS gateway (helpline SIM on an Android phone) ---------------------------------------
+
+export function useSmsGatewayStatus() {
+  return useQuery({
+    queryKey: ['sms-gateway', 'status'],
+    queryFn: () => api.get<SmsGatewayStatus>('/api/sms-gateway/status'),
+    refetchInterval: 10_000,
+  })
+}
+
+export function useRegisterSmsGateway() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: SmsGatewayRegisterRequest) =>
+      api.post<SmsGatewayRegistered>('/api/sms-gateway/register', body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sms-gateway'] }),
   })
 }

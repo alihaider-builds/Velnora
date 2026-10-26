@@ -380,3 +380,25 @@ export interface PlaceSuggestResponse {
   provider: 'google' | 'osm'
   items: PlaceSuggestion[]
 }
+
+export interface SmsGatewayStatus {
+  /** Signing key set on the server: forwarded SMS are accepted. */
+  configured: boolean
+  reply_enabled: boolean
+  has_credentials: boolean
+  webhook_path: string
+  last_received_at: string | null
+  received_24h: number
+}
+
+export interface SmsGatewayRegisterRequest {
+  public_url: string
+  username?: string
+  password?: string
+}
+
+export interface SmsGatewayRegistered {
+  webhook_url: string
+  webhook_id: string | null
+  replaced: number
+}

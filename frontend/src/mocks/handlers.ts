@@ -649,6 +649,29 @@ const MOCK_PLACES: PlaceSuggestion[] = [
 ]
 
 export const categoryHandlers = [
+  http.get(
+    '/api/sms-gateway/status',
+    reviewerOnly(() =>
+      HttpResponse.json({
+        configured: false,
+        reply_enabled: false,
+        has_credentials: false,
+        webhook_path: '/api/inbound/sms-gateway',
+        last_received_at: null,
+        received_24h: 0,
+      }),
+    ),
+  ),
+  http.post(
+    '/api/sms-gateway/register',
+    reviewerOnly(() =>
+      error(
+        409,
+        'CHANNEL_NOT_CONFIGURED',
+        'The mock server has no SMS gateway. Use the real backend.',
+      ),
+    ),
+  ),
   http.get('/api/places/suggest', async ({ request }) => {
     await delay(150)
     const q = (new URL(request.url).searchParams.get('q') ?? '').trim().toLowerCase()

@@ -43,6 +43,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     install_error_handlers(app)
 
     @app.middleware("http")
+    async def tunnel_inbound_only(request: Request, call_next):
+        via_tunnel = "cf-connecting-ip" in request.headers or "cf-ray" in request.headers
+        if settings.tunnel_inbound_only and via_tunnel and not request.url.path.startswith("/api/inbound/"):
+            return JSONResponse(error_body("TUNNEL_PATH_BLOCKED", "Only webhooks are reachable through the tunnel."),
+                                status_code=403)
+        return await call_next(request)
+
+    @app.middleware("http")
     async def limit_body_size(request: Request, call_next):
         length = request.headers.get("content-length")
         if length and length.isdigit() and int(length) > settings.max_request_bytes:

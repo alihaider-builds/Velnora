@@ -368,6 +368,27 @@ class HelplinePatch(BaseModel):
     active: bool | None = None
 
 
+class SmsGatewayStatus(BaseModel):
+    configured: bool  # signing key set: forwarded SMS are accepted
+    reply_enabled: bool
+    has_credentials: bool  # gateway Cloud Server username/password in .env
+    webhook_path: str
+    last_received_at: str | None
+    received_24h: int
+
+
+class SmsGatewayRegister(BaseModel):
+    public_url: str = Field(pattern=r"^https://[A-Za-z0-9.-]+(:[0-9]+)?/?$", max_length=200)
+    username: str | None = Field(default=None, max_length=100)
+    password: str | None = Field(default=None, max_length=200)
+
+
+class SmsGatewayRegistered(BaseModel):
+    webhook_url: str
+    webhook_id: str | None
+    replaced: int
+
+
 class PlaceSuggestion(BaseModel):
     label: str
     name: str

@@ -6,6 +6,7 @@ import { BarList } from '../components/BarList'
 import { NeedChip } from '../components/badges'
 import { CategoryManager } from '../components/CategoryManager'
 import { HelplineManager } from '../components/HelplineManager'
+import { SmsGatewayPanel } from '../components/SmsGatewayPanel'
 import { ErrorState, Skeleton } from '../components/ui'
 import { CHANNEL_ORDER, CHANNELS, STATUS, URGENCY_LABEL } from '../lib/meta'
 
@@ -203,6 +204,7 @@ export function Dashboard() {
         </section>
       </div>
 
+      <SmsGatewayPanel />
       <HelplineManager />
       <CategoryManager />
 

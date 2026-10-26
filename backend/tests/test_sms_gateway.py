@@ -91,3 +91,62 @@ def test_reply_failure_keeps_the_report(tmp_path):
         assert post(c, event()).status_code == 200
         c.post("/api/auth/login", json={"password": PASSWORD})
         assert len(c.get("/api/reports").json()["items"]) == 1
+
+
+# ---------- dashboard status, one-click registration, tunnel guard ----------
+
+def test_tunnel_reaches_only_webhooks(tmp_path):
+    cf = {"cf-connecting-ip": "203.0.113.5", "cf-ray": "abc"}
+    with app_client(tmp_path) as c:
+        assert c.post("/api/auth/login", json={"password": PASSWORD}, headers=cf).status_code == 403
+        assert c.get("/api/reports", headers=cf).json()["error"]["code"] == "TUNNEL_PATH_BLOCKED"
+        assert c.get("/api/health", headers=cf).status_code == 403
+        raw = json.dumps(event()).encode()
+        ts = str(int(time.time()))
+        resp = c.post("/api/inbound/sms-gateway", content=raw,
+                      headers={**cf, "X-Timestamp": ts, "X-Signature": sign(KEY, raw, ts)})
+        assert resp.status_code == 200
+        assert c.get("/api/health").status_code == 200  # local access unaffected
+
+
+def test_status_shows_received_sms(tmp_path):
+    with app_client(tmp_path) as c:
+        assert c.get("/api/sms-gateway/status").status_code == 401
+        c.post("/api/auth/login", json={"password": PASSWORD})
+        before = c.get("/api/sms-gateway/status").json()
+        assert before == {"configured": True, "reply_enabled": False, "has_credentials": False,
+                          "webhook_path": "/api/inbound/sms-gateway", "last_received_at": None, "received_24h": 0}
+        post(c, event())
+        after = c.get("/api/sms-gateway/status").json()
+        assert after["received_24h"] == 1 and after["last_received_at"]
+
+
+@respx.mock
+def test_register_replaces_old_tunnel_webhooks(tmp_path):
+    respx.get(f"{API}/webhooks").mock(return_value=httpx.Response(200, json=[
+        {"id": "old1", "url": "https://old.trycloudflare.com/api/inbound/sms-gateway", "event": "sms:received"},
+        {"id": "keep", "url": "https://other.example/hook", "event": "sms:received"}]))
+    deleted = respx.delete(f"{API}/webhooks/old1").mock(return_value=httpx.Response(204))
+    created = respx.post(f"{API}/webhooks").mock(return_value=httpx.Response(201, json={"id": "new1"}))
+    with app_client(tmp_path) as c:
+        c.post("/api/auth/login", json={"password": PASSWORD})
+        resp = c.post("/api/sms-gateway/register", json={"public_url": "https://new.trycloudflare.com/",
+                                                          "username": "user", "password": "pass"})
+    assert resp.status_code == 200
+    assert resp.json() == {"webhook_url": "https://new.trycloudflare.com/api/inbound/sms-gateway",
+                           "webhook_id": "new1", "replaced": 1}
+    assert deleted.called and json.loads(created.calls[0].request.content) == {
+        "url": "https://new.trycloudflare.com/api/inbound/sms-gateway", "event": "sms:received"}
+
+
+@respx.mock
+def test_register_errors(tmp_path):
+    respx.get(f"{API}/webhooks").mock(return_value=httpx.Response(401))
+    with app_client(tmp_path) as c:
+        c.post("/api/auth/login", json={"password": PASSWORD})
+        body = {"public_url": "https://x.trycloudflare.com", "username": "u", "password": "bad"}
+        assert c.post("/api/sms-gateway/register", json=body).json()["error"]["code"] == "GATEWAY_AUTH_FAILED"
+        no_creds = {"public_url": "https://x.trycloudflare.com"}
+        assert c.post("/api/sms-gateway/register", json=no_creds).status_code == 400
+        assert c.post("/api/sms-gateway/register",
+                      json={**body, "public_url": "http://insecure.example"}).status_code == 400

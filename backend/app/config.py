@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     sms_gateway_api_url: str = "https://api.sms-gate.app/3rdparty/v1"
     sms_gateway_username: str = ""
     sms_gateway_password: str = ""
+    # Requests that arrive through a Cloudflare tunnel may only reach the /api/inbound/* webhooks, so a
+    # public tunnel never exposes sign-in or report data.
+    tunnel_inbound_only: bool = True
     sender_hash_secret: str = ""
     helpline_emergency_number: str = "1122"
 
