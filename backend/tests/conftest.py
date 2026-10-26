@@ -1,5 +1,15 @@
+"""Shared test setup.
+
+By default every test gets its own temporary SQLite file. To run the same tests on PostgreSQL, set
+TEST_DATABASE_URL to a LOCAL throwaway database (the tests empty its tables before each test):
+    TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:5432/relieflens_test python -m pytest
+"""
+
+import os
+
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.engine import make_url
 
 from app.auth import hash_password
 from app.config import Settings
@@ -8,6 +18,8 @@ from app.factory import create_app
 PASSWORD = "test-password-123"
 DEMO_TEXT = "Buner mein pani ghar mein aa gaya, 5 bachay hain, dawai aur saaf pani chahiye."
 _HASH = hash_password(PASSWORD)
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "")
+APP_TABLES = "reports, extractions, locations, audit_log, categories, helplines, geocode_cache"
 
 
 def make_settings(tmp_path, **overrides) -> Settings:
@@ -24,8 +36,34 @@ def make_settings(tmp_path, **overrides) -> Settings:
         twilio_validate_signature=False,
         demo_mode=True,
     )
+    if TEST_DATABASE_URL:
+        base["database_url"] = TEST_DATABASE_URL
     base.update(overrides)
     return Settings(**base)
+
+
+@pytest.fixture(scope="session")
+def postgres_test_db():
+    """Migrate the local test database once; None when the tests use SQLite."""
+    if not TEST_DATABASE_URL:
+        return None
+    if make_url(TEST_DATABASE_URL).host not in ("localhost", "127.0.0.1", "::1"):
+        pytest.exit("TEST_DATABASE_URL must be a local throwaway database: the tests delete its rows.", 2)
+    from app.migrate import apply
+
+    apply(TEST_DATABASE_URL, log=lambda _msg: None)
+    return TEST_DATABASE_URL
+
+
+@pytest.fixture(autouse=True)
+def _empty_postgres(postgres_test_db):
+    if postgres_test_db:
+        import psycopg
+
+        from app.migrate import psycopg_url
+
+        with psycopg.connect(psycopg_url(postgres_test_db)) as conn:
+            conn.execute(f"truncate {APP_TABLES} restart identity cascade")
 
 
 @pytest.fixture

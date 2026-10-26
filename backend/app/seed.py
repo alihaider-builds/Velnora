@@ -1,7 +1,10 @@
 """Load the 30 synthetic sample reports into the database.
 
     python -m app.seed            # add samples (skips if samples already exist)
-    python -m app.seed --reset    # delete the database first
+    python -m app.seed --reset    # delete the local SQLite file first
+
+Demo data only: it refuses to run unless DEMO_MODE=true, and --reset never touches a
+PostgreSQL/Supabase database (DATABASE_URL). Nothing runs this automatically.
 
 Extraction uses the configured model (LLM_BACKEND). Locations use each sample's
 labelled target point (no network calls), and a few reports are approved so the
@@ -34,13 +37,21 @@ def load_samples() -> list[dict]:
         return [json.loads(line) for line in f if line.strip()]
 
 
+class SeedRefused(Exception):
+    pass
+
+
 async def seed(settings: Settings, reset: bool = False) -> int:
+    if not settings.demo_mode:
+        raise SeedRefused("DEMO_MODE is false: synthetic reports are never loaded into a production database.")
+    if reset and settings.database_url:
+        raise SeedRefused("--reset only deletes a local SQLite file. It never deletes a PostgreSQL/Supabase database.")
     db_path = settings.resolve(settings.database_path)
     if reset and db_path.exists():
         db_path.unlink()
         for suffix in ("-wal", "-shm"):
             db_path.with_name(db_path.name + suffix).unlink(missing_ok=True)
-    engine = make_engine(db_path)
+    engine = make_engine(settings)
     ensure_builtins(engine)
     with engine.connect() as conn:
         if conn.execute(select(reports.c.id).where(reports.c.provider_message_id.like("seed-%"))).first():
@@ -84,11 +95,14 @@ async def seed(settings: Settings, reset: bool = False) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Load synthetic sample reports.")
-    parser.add_argument("--reset", action="store_true", help="delete the database first")
+    parser.add_argument("--reset", action="store_true", help="delete the local SQLite file first")
     args = parser.parse_args()
     settings = Settings()
     print(f"Seeding with model backend: {settings.llm_backend} ({settings.model_name})")
-    n = asyncio.run(seed(settings, reset=args.reset))
+    try:
+        n = asyncio.run(seed(settings, reset=args.reset))
+    except SeedRefused as exc:
+        raise SystemExit(f"Not seeding: {exc}") from None
     print(f"Loaded {n} synthetic reports.")
 
 

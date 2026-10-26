@@ -35,15 +35,16 @@ def _quantities(b: repo.Bundle) -> list[dict]:
 
 def reviewer_rows(conn: Connection) -> list[dict]:
     labels = {c["key"]: c["label"] for c in categories.list_all(conn, include_inactive=True)}
+    approved = repo.approved_times(conn)
     rows = []
-    for b in repo.load_all(conn):
+    for b in repo.load_all(conn, status="approved"):
         point = b.confirmed_point()
         if b.report["status"] != "approved" or point is None:
             continue
         r = b.report
         rows.append({
             "reference": r["reference"],
-            "approved_at": repo.approved_at(conn, b.id) or r["updated_at"],
+            "approved_at": approved.get(b.id) or r["updated_at"],
             "received_at": r["created_at"],
             "channel": r["channel"],
             "needs": [labels.get(n, n) for n in b.effective_needs()],
@@ -61,7 +62,9 @@ def reviewer_rows(conn: Connection) -> list[dict]:
 
 
 def public_rows(conn: Connection, settings: Settings) -> list[dict]:
-    rows = [p for p in (repo.build_public(conn, b, settings) for b in repo.load_all(conn)) if p]
+    approved = repo.approved_times(conn)
+    rows = [p for p in (repo.build_public(conn, b, settings, approved)
+                        for b in repo.load_all(conn, status="approved")) if p]
     rows.sort(key=lambda x: x["approved_at"], reverse=True)
     return rows
 

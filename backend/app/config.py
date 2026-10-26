@@ -33,7 +33,9 @@ class Settings(BaseSettings):
     session_secret: str = ""
     session_max_age_seconds: int = 12 * 60 * 60
 
-    # Storage
+    # Storage. DATABASE_URL (PostgreSQL / Supabase) wins over DATABASE_PATH (local SQLite file).
+    database_url: str = ""
+    migration_database_url: str = ""  # owner login used only by `python -m app.migrate`
     database_path: str = "storage/relieflens.db"
     upload_dir: str = "storage/uploads"
     max_image_bytes: int = 5 * 1024 * 1024

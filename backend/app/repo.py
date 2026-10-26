@@ -100,10 +100,16 @@ def _bundle(row, ext_by_id: dict, loc_by_id: dict) -> Bundle:
     return Bundle(report=r, extraction=ext_by_id.get(r["id"]), location=loc_by_id.get(r["id"]))
 
 
-def load_all(conn: Connection) -> list[Bundle]:
-    ext_by_id = {e.report_id: dict(e._mapping) for e in conn.execute(select(extractions))}
-    loc_by_id = {loc.report_id: dict(loc._mapping) for loc in conn.execute(select(locations))}
-    return [_bundle(row, ext_by_id, loc_by_id) for row in conn.execute(select(reports))]
+def load_all(conn: Connection, status: str | None = None) -> list[Bundle]:
+    """Every report (or only those with `status`) with its extraction and location, in three queries."""
+    rq, eq, lq = select(reports), select(extractions), select(locations)
+    if status:
+        rq = rq.where(reports.c.status == status)
+        eq = eq.join(reports, reports.c.id == extractions.c.report_id).where(reports.c.status == status)
+        lq = lq.join(reports, reports.c.id == locations.c.report_id).where(reports.c.status == status)
+    ext_by_id = {e.report_id: dict(e._mapping) for e in conn.execute(eq)}
+    loc_by_id = {loc.report_id: dict(loc._mapping) for loc in conn.execute(lq)}
+    return [_bundle(row, ext_by_id, loc_by_id) for row in conn.execute(rq)]
 
 
 def load_one(conn: Connection, report_id: str) -> Bundle:
@@ -281,8 +287,21 @@ def approved_at(conn: Connection, report_id: str) -> str | None:
     ).scalar()
 
 
-def build_public(conn: Connection, b: Bundle, settings: Settings) -> dict | None:
-    """The only shape the public ever sees: no text, numbers, images or exact coordinates."""
+def approved_times(conn: Connection) -> dict[str, str]:
+    """Latest approval time of every report, in one query (avoids one query per report on a remote database)."""
+    rows = conn.execute(
+        select(audit_log.c.report_id, func.max(audit_log.c.at))
+        .where(audit_log.c.to_status == "approved")
+        .group_by(audit_log.c.report_id)
+    )
+    return {report_id: at for report_id, at in rows}
+
+
+def build_public(
+    conn: Connection, b: Bundle, settings: Settings, approved: dict[str, str] | None = None
+) -> dict | None:
+    """The only shape the public ever sees: no text, numbers, images or exact coordinates.
+    Pass `approved` (from `approved_times`) when building many."""
     point = b.confirmed_point()
     if b.report["status"] != "approved" or point is None:
         return None
@@ -293,7 +312,8 @@ def build_public(conn: Connection, b: Bundle, settings: Settings) -> dict | None
         "area_label": privacy.area_label((b.location or {}).get("confirmed_label")),
         "lat": privacy.round_coord(point[0], d),
         "lng": privacy.round_coord(point[1], d),
-        "approved_at": approved_at(conn, b.id) or b.report["updated_at"],
+        "approved_at": (approved.get(b.id) if approved is not None else approved_at(conn, b.id))
+        or b.report["updated_at"],
         "is_synthetic": bool(b.report["is_synthetic"]),
     }
 
