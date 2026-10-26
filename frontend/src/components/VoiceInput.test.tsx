@@ -132,7 +132,7 @@ describe('VoiceInput offline (on-device) mode', () => {
     expect((FakeRecognition.last as unknown as { processLocally?: boolean }).processLocally).toBe(
       true,
     )
-    expect(screen.getByText(/no audio leaves your computer/)).toBeTruthy()
+    expect(screen.getByText(/Listening \(offline\)/)).toBeTruthy()
   })
 
   it('offers a one-time download and switches to offline when it finishes', async () => {

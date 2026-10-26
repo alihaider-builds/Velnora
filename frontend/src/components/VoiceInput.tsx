@@ -361,23 +361,13 @@ export function BrowserVoiceInput({
         aria-live="polite"
         className={`mt-1 text-xs ${status === 'error' ? 'font-medium text-rejected' : 'text-muted'}`}
       >
-        {message ||
-          (blockedOffline
-            ? offlineHelp()
-            : 'Speech becomes editable text. Nothing is sent until you press Submit.')}
+        {message || (blockedOffline ? offlineHelp() : '')}
       </p>
       {interim && (
         <p dir="auto" className="mt-1 text-sm italic text-muted">
           {interim}…
         </p>
       )}
-      <p className="mt-1 text-[11px] leading-snug text-muted">
-        {offlineReady
-          ? 'Speech is recognised on this device; no audio leaves your computer.'
-          : "Your browser converts the speech; online this uses the browser maker's speech service."}{' '}
-        ReliefLens doesn't record or upload audio. For Roman Urdu, speak Urdu or English and edit
-        the text.
-      </p>
     </div>
   )
 }

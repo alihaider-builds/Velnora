@@ -104,7 +104,9 @@ describe('Submit page', () => {
 
   it('submits the real form fields and opens the confirmation page', async () => {
     renderRoutes(routes, '/submit')
-    await waitFor(() => expect(screen.getByText(/Test\/demo report/)).toBeTruthy())
+    // demo mode comes from /api/health; once it has loaded, demo reports are marked synthetic
+    await waitFor(() => expect(api.calls.some((c) => c.path === '/api/health')).toBe(true))
+    await new Promise((r) => setTimeout(r, 50))
     fireEvent.change(textBox(), { target: { value: 'Pani aa gaya hai, dawai chahiye' } })
     fireEvent.click(submitButton())
     expect(await screen.findByText('Report received')).toBeTruthy()

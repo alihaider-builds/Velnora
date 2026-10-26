@@ -207,12 +207,8 @@ export function OfflineVoiceInput({
         aria-live="polite"
         className={`mt-1 text-xs ${status === 'error' ? 'font-medium text-rejected' : 'text-muted'}`}
       >
-        {message || 'Speech becomes editable text. Nothing is sent until you press Submit.'}
+        {message}
         {busy && progress !== null && progress < 100 && ` Loading speech model ${progress}%`}
-      </p>
-      <p className="mt-1 text-[11px] leading-snug text-muted">
-        Speech is converted on this device by an offline speech model — no internet needed. For
-        Roman Urdu, speak Urdu or English and edit the text.
       </p>
     </div>
   )

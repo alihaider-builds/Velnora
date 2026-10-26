@@ -21,14 +21,7 @@ import type {
   ReportStatus,
   Urgency,
 } from '../api/types'
-import {
-  ChannelBadge,
-  DemoTag,
-  LanguageBadge,
-  NeedChip,
-  StatusBadge,
-  UrgencyBadge,
-} from '../components/badges'
+import { ChannelBadge, NeedChip, StatusBadge, UrgencyBadge } from '../components/badges'
 import { UserText } from '../components/UserText'
 import { EmptyState, ErrorState, Skeleton } from '../components/ui'
 import { exactTime, relativeTime } from '../lib/format'
@@ -114,12 +107,6 @@ function Row({
           <span className="lg:hidden">
             <ChannelBadge channel={item.channel} />
           </span>
-          <LanguageBadge language={item.language} />
-          {item.is_synthetic && (
-            <span className="hidden xl:inline">
-              <DemoTag />
-            </span>
-          )}
           {extracting && (
             <span className="inline-flex items-center gap-1 text-xs font-medium text-ai">
               <Loader2 size={12} className="animate-spin" aria-hidden="true" /> Reading…
@@ -141,14 +128,21 @@ function Row({
             </span>
           )}
           {item.duplicate_count > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs font-medium">
+            <span
+              className="inline-flex items-center gap-1 text-xs text-muted"
+              title={`${item.duplicate_count} possible duplicate${item.duplicate_count > 1 ? 's' : ''}`}
+            >
               <Copy size={12} aria-hidden="true" />
-              {item.duplicate_count} possible duplicate{item.duplicate_count > 1 ? 's' : ''}
+              {item.duplicate_count}
+              <span className="sr-only">
+                possible duplicate{item.duplicate_count > 1 ? 's' : ''}
+              </span>
             </span>
           )}
           {item.has_voice_note && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-surface px-2 py-0.5 text-xs font-medium text-primary">
-              <Mic size={12} aria-hidden="true" /> Voice note
+            <span className="inline-flex text-primary" title="Voice note">
+              <Mic size={13} aria-hidden="true" />
+              <span className="sr-only">Voice note</span>
             </span>
           )}
         </div>
@@ -285,12 +279,7 @@ export function ReviewQueue() {
   return (
     <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Review queue</h1>
-          <p className="text-sm text-muted">
-            In order of arrival. The AI reads reports; you decide what matters most.
-          </p>
-        </div>
+        <h1 className="text-2xl font-bold tracking-tight">Review queue</h1>
         <div className="flex flex-wrap items-center gap-2">
           <DownloadApproved scope="review" />
           <Link to="/review/dashboard" className="btn btn-sm">

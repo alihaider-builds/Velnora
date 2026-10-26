@@ -1,15 +1,4 @@
-import {
-  Camera,
-  Languages,
-  Lock,
-  MapPin,
-  Mic,
-  Phone,
-  Send,
-  Trash2,
-  UserCheck,
-  X,
-} from 'lucide-react'
+import { Camera, MapPin, Mic, Phone, Send, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { ApiError } from '../api/client'
@@ -293,28 +282,7 @@ export function Submit() {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-4 lg:py-5">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Submit a report</h1>
-          <p className="text-sm text-muted">
-            Tell us what is happening and what help is needed. A reviewer checks every report before
-            anything appears on the public map.
-          </p>
-        </div>
-        <ul className="flex flex-wrap gap-1.5 text-xs" aria-label="About this form">
-          {[
-            { icon: Languages, text: 'اردو · Roman Urdu · English' },
-            { icon: UserCheck, text: 'Checked by a person' },
-            { icon: Lock, text: 'Phone numbers stay private' },
-          ].map(({ icon: Icon, text: label }) => (
-            <li
-              key={label}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1"
-            >
-              <Icon size={13} aria-hidden="true" className="text-primary" />
-              {label}
-            </li>
-          ))}
-        </ul>
+        <h1 className="text-2xl font-bold tracking-tight">Submit a report</h1>
       </div>
 
       <form
@@ -333,7 +301,7 @@ export function Submit() {
             dir="auto"
             rows={7}
             className="input min-h-40 flex-1 resize-y leading-relaxed"
-            placeholder="Misal: Hamare gaon mein pani aa gaya hai, 5 bachay hain, dawai chahiye. / Example: Water has entered our village, we need medicine."
+            placeholder="Type here…"
             value={text}
             onChange={(e) => setText(e.target.value)}
             onBlur={() => setTouched(true)}
@@ -342,7 +310,7 @@ export function Submit() {
           />
           <div id="report-text-help" className="flex justify-between gap-3 text-sm">
             <span className={showTextError ? 'text-rejected' : 'text-muted'}>
-              {showTextError || 'Urdu, Roman Urdu or English · 10–2,000 characters.'}
+              {showTextError || ''}
             </span>
             <span
               className={`shrink-0 tabular-nums ${length > MAX ? 'text-rejected' : 'text-muted'}`}
@@ -408,7 +376,7 @@ export function Submit() {
         <div className="flex min-w-0 flex-col gap-4">
           <div>
             <label htmlFor="report-place" className="label">
-              Where? <span className="font-normal text-muted">(optional)</span>
+              Where?
             </label>
             <PlaceAutocomplete
               id="report-place"
@@ -424,12 +392,11 @@ export function Submit() {
               describedBy="report-place-help"
               invalid={!!errors.place}
             />
-            <p
-              id="report-place-help"
-              className={`mt-1 text-xs ${errors.place ? 'text-rejected' : 'text-muted'}`}
-            >
-              {errors.place ?? 'Village, area or landmark. Pick a suggestion to add a pin.'}
-            </p>
+            {errors.place && (
+              <p id="report-place-help" className="mt-1 text-xs text-rejected">
+                {errors.place}
+              </p>
+            )}
 
             <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-1.5">
               <MapPin
@@ -472,7 +439,7 @@ export function Submit() {
 
           <div>
             <span className="label" id="photo-label">
-              Photo <span className="font-normal text-muted">(optional)</span>
+              Photo
             </span>
             {image && preview ? (
               <div className="flex items-center gap-3">
@@ -517,14 +484,11 @@ export function Submit() {
                 />
               </label>
             )}
-            <p
-              id="photo-help"
-              className={`mt-1 text-xs ${errors.image ? 'font-medium text-rejected' : 'text-muted'}`}
-              role={errors.image ? 'alert' : undefined}
-            >
-              {errors.image ??
-                'JPG, PNG or WebP, up to 5 MB. Only reviewers see photos; location data in the photo is removed.'}
-            </p>
+            {errors.image && (
+              <p id="photo-help" role="alert" className="mt-1 text-xs font-medium text-rejected">
+                {errors.image}
+              </p>
+            )}
           </div>
 
           {helplines.length > 0 && (
@@ -542,16 +506,6 @@ export function Submit() {
 
         {/* Submit bar spans both columns */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border pt-3 lg:col-span-2">
-          <p className="flex items-center gap-1.5 text-xs text-muted">
-            <Lock size={13} aria-hidden="true" className="shrink-0" />
-            Don't include ID numbers. Phone numbers are hidden from the public.
-          </p>
-          {demoMode && (
-            <label className="flex min-h-11 items-center gap-2 text-xs text-muted">
-              <input type="checkbox" checked disabled className="h-4 w-4 accent-[var(--primary)]" />
-              Test/demo report (synthetic)
-            </label>
-          )}
           {errors.form && (
             <p role="alert" className="w-full text-sm font-medium text-rejected lg:w-auto">
               {errors.form}
