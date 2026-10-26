@@ -77,43 +77,59 @@ ReliefLens is a review workstation plus a public map.
 
 ```mermaid
 flowchart LR
-  subgraph Intake
-    SMS["SMS to helpline SIM<br/>(textbee / SMS Gateway app)"]
-    WA["WhatsApp / SMS<br/>(Twilio webhooks)"]
-    WEB["Web form<br/>+ offline voice typing"]
-    CALL["Helpline call<br/>recording"]
-    SIM["Demo simulator"]
+  subgraph Intake["Report intake"]
+    SMS["📱 SMS to helpline number<br/>(textbee app on the helpline phone)"]
+    WEB["💻 In-app report<br/>(text or voice typing)"]
+  end
+
+  subgraph Frontend["React app (browser)"]
+    MAP["🗺️ Public map"]
+    REV["🧑‍💼 Review queue · report screen<br/>(evidence, location, duplicates)"]
+    DASH["📊 Dashboard · exports"]
   end
 
   subgraph Backend["FastAPI backend"]
-    IN["Signed webhooks<br/>+ create_report()"]
-    PRIV["Phone masking<br/>sender hashing<br/>EXIF removal"]
-    TR["Transcription<br/>(Gemma 4 audio, optional)"]
-    EX["Extraction<br/>Gemma 4 via Ollama<br/>→ JSON schema → evidence check"]
-    GEO["Place search<br/>OSM / Google"]
+    IN["Intake<br/>signature check · phone masking<br/>sender hashing · photo GPS removal"]
+    AI["Gemma 4 via Ollama<br/>JSON schema → validate → evidence check"]
+    GEO["Place search<br/>OpenStreetMap"]
     DUP["Duplicate scoring"]
-    DB[("SQLite")]
+    API["REST API /api/*<br/>reviewer sign-in · privacy filter"]
+    FILES[("Uploads on disk<br/>photos · voice notes")]
   end
 
-  subgraph Frontend["React app"]
-    Q["Review queue"]
-    RD["Report: evidence,<br/>location, duplicates"]
-    DASH["Dashboard"]
-    MAP["Public map"]
+  subgraph Supabase["Supabase"]
+    DB[("PostgreSQL<br/>reports · extractions · locations<br/>audit_log · categories · helplines")]
+    RLS["Row Level Security on<br/>anon API returns nothing"]
   end
 
-  SMS & WA & WEB & SIM --> IN
-  CALL --> TR --> EX
-  IN --> PRIV --> DB
-  IN --> EX --> DB
-  EX --> GEO --> DB
-  DB --> DUP
-  DB --> Q --> RD -->|approve / reject / merge| DB
-  DB -->|approved, privacy-filtered| MAP
-  DB --> DASH
+  SMS -- "signed webhook<br/>(Cloudflare Tunnel)" --> IN
+  WEB --> API --> IN
+  IN --> AI --> GEO
+  IN --> FILES
+  Backend <-->|"relieflens_backend role<br/>(DATABASE_URL)"| DB
+  DB --- RLS
+  API --> REV
+  API --> DASH
+  API -- "approved only, location ~1 km,<br/>no text or numbers" --> MAP
+  REV -- "approve · reject · merge<br/>(recorded in audit_log)" --> API
 ```
 
-- **Backend** (`backend/`): FastAPI, SQLAlchemy on SQLite (WAL), background jobs for extraction/transcription, argon2 reviewer sign-in with signed cookies, rate limiting, HMAC-verified webhooks. The full API contract is in [`docs/BACKEND_TECH_SPEC.md`](docs/BACKEND_TECH_SPEC.md) §4; interactive docs run at `/api/docs`.
+**How it fits together**
+1. A report arrives as an SMS (forwarded by textbee through a signed webhook) or from the in-app form.
+2. The FastAPI backend checks the signature, masks phone numbers, hashes the sender and removes photo location data.
+3. Gemma 4 (through Ollama) extracts needs, quantities, place and time, each with quoted evidence; the backend validates it against a JSON schema and finds every quote in the original text.
+4. Everything is stored in **Supabase PostgreSQL**: the report, the AI extraction, the suggested and confirmed location, and an append-only audit log. Photos and voice notes stay on the backend's disk; the database stores only their file names.
+5. Reviewers work in the React app, which talks **only to FastAPI** (`/api/...`), never to Supabase directly, so the browser holds no Supabase keys.
+6. Approved reports with a confirmed location reach the public map and the CSV / GeoJSON exports through a privacy filter.
+
+**Database security (Supabase)**
+- The backend connects with a limited `relieflens_backend` role: it can read and write ReliefLens rows but cannot change tables, permissions or the audit trail. Migrations run separately with the owner login.
+- Row Level Security is switched on with no public policies, so Supabase's automatic REST API returns nothing to anyone holding the anon key.
+- Without `DATABASE_URL`, the backend falls back to a local SQLite file with the same tables, for development, demos and tests.
+
+Full setup: [`docs/SUPABASE_SETUP.md`](docs/SUPABASE_SETUP.md).
+
+- **Backend** (`backend/`): FastAPI, SQLAlchemy on Supabase PostgreSQL (SQLite for local development), SQL migrations in `backend/migrations/`, background jobs for extraction, argon2 reviewer sign-in with signed cookies, rate limiting, HMAC-verified webhooks. The full API contract is in [`docs/BACKEND_TECH_SPEC.md`](docs/BACKEND_TECH_SPEC.md) §4; interactive docs run at `/api/docs`.
 - **Frontend** (`frontend/`): React + TypeScript + Vite, TanStack Query, MapLibre GL, Tailwind. A Mock Service Worker backend lets the UI run without the server.
 - **Design documents**: [PRD](docs/PRD.md), [UI/UX spec](docs/UI_UX_SPEC.md), [backend spec](docs/BACKEND_TECH_SPEC.md), [project brief](docs/PROJECT_BRIEF.md).
 
@@ -122,7 +138,8 @@ flowchart LR
 | Layer | Technologies |
 |---|---|
 | Languages | Python 3.12+, TypeScript |
-| Backend | FastAPI, Pydantic v2, pydantic-settings, SQLAlchemy 2 (SQLite), httpx, rapidfuzz, Pillow, argon2-cffi, itsdangerous, python-multipart, Uvicorn |
+| Backend | FastAPI, Pydantic v2, pydantic-settings, SQLAlchemy 2, psycopg, httpx, rapidfuzz, Pillow, argon2-cffi, itsdangerous, python-multipart, Uvicorn |
+| Database | **Supabase PostgreSQL** (Row Level Security, limited backend role, SQL migrations); SQLite for local development and tests |
 | AI | **Gemma 4** (Google) via **Ollama** for extraction; Gemma 4 audio via Hugging Face Transformers (optional) for calls; **Whisper** (onnx-community, run in the browser with Transformers.js / ONNX Runtime Web) for offline voice typing |
 | Frontend | React 18, Vite, TanStack Query, React Router, Tailwind CSS 4, MapLibre GL, Lucide icons, Mock Service Worker |
 | Maps & places | OpenStreetMap data via OpenFreeMap tiles, Nominatim (geocoding), Photon (type-ahead); Google Geocoding / Places / Map Tiles when keys are set |
